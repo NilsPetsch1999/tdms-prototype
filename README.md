@@ -1,134 +1,135 @@
-# Test Data Management System (TDMS) – Prototype
+# Test Data Management System (TDMS) - Prototype
 
 ## Overview
-This repository contains a prototype implementation of a Test Data Management System (TDMS) developed in the context of a Master’s thesis.
- 
-The goal of the prototype is to demonstrate how synthetic and masked real test data can be generated, managed, versioned, and reused in a datenschutzkonformer (GDPR-aware) manner for software testing purposes.
+This repository contains a backend prototype for a Test Data Management System (TDMS) built with Spring Boot.
 
-The prototype focuses on conceptual clarity and architectural feasibility, not on a production-ready implementation.
+The prototype supports:
+- synthetic dataset generation from a live MySQL schema
+- masking/anonymization of real MySQL table data
+- dataset versioning with reproducible metadata
+- metadata in MySQL + generated data files on filesystem
 
-## Objectives 
-- Provide a centralized system for managing test data
-- Support synthetic test data generation
-- Support masking/anonymization of real datasets
-- Enable versioning and reproducibility of test datasets
-- Store and manage metadata describing test data
-- Compare synthetic vs. masked real data in practice
-- Demonstrate privacy-by-design principles
+Important: this prototype supports MySQL database instances only.
 
-## High-Level Architecture
+## Architecture
+- Backend: Spring Boot (REST API)
+- Metadata DB: MySQL
+- Data storage: CSV files on local filesystem (`tdms-data/` by default)
 
-## Frontend
-PWA Frontend (React)
+### Why this storage approach?
+For a prototype, splitting metadata and payload files is pragmatic:
+- MySQL is efficient for querying metadata and version history
+- CSV files are simple to inspect, export, and compare
+- keeping large dataset payloads outside metadata tables avoids DB bloat
 
-#### Why PWA?
+## Implemented Backend Components
+- Schema Introspection Service: reads schemas/tables/columns from `information_schema`
+- Test Data Generator: schema-driven synthetic generation, optional deterministic `seed`
+- Masking Engine: substitution, pseudonymization, tokenization, hashing, generalization
+- Version Manager: every generation/masking request creates a new immutable dataset version
+- Metadata Service: stores lineage and reproducibility data
 
-- Platform-independent (desktop & mobile)
-- Lightweight
-- Offline-capable (optional)
-- Clean UI for academic demos
+## API Endpoints
+Base path: `/api`
 
-#### Responseablilities
-- Create test data generation requests
-- Configure masking rules
-- Browse test data versions
-- View metadata and lineage
-- import real testdata
-- connect to databases
+### Schema inspection
+- `GET /schemas`
+- `GET /schemas/{schemaName}/tables`
+- `GET /schemas/{schemaName}/tables/{tableName}/columns`
 
-## Backend
-Java - Spring Boot 
+### Dataset generation and masking
+- `POST /datasets/synthetic`
+- `POST /datasets/masked`
 
-#### Possible Backend Services: 
-- Test Data Generator (using ai agents)
-- Masking Engine
-- Version Manager
-- Metadata Service
+### Dataset browsing and download
+- `GET /datasets`
+- `GET /datasets/{datasetId}/versions`
+- `GET /datasets/{datasetId}/versions/{versionNumber}`
+- `GET /datasets/{datasetId}/versions/{versionNumber}/file`
 
-#### Database + Object/File Storage
-- MYSQL for Metadata
-- Data could be stored as: SQL dumps, CSV, JSON, Object Storage 
+## OpenAPI / Swagger
+After starting the backend, OpenAPI docs are available at:
+- OpenAPI JSON: `http://localhost:8080/api-docs`
+- Swagger UI: `http://localhost:8080/swagger-ui.html`
 
-## Backend Components
+## Example Requests
+### Synthetic dataset
+```json
+POST /api/datasets/synthetic
+{
+  "datasetName": "customer_synth",
+  "description": "Synthetic customer demo",
+  "schemaName": "tdms",
+  "tableName": "customer",
+  "rowCount": 1000,
+  "seed": 12345,
+  "schemaVersion": "v1",
+  "createdBy": "nils"
+}
+```
 
-## Test Data Generator
-Responsible for synthetic data creation.
+### Masked dataset
+```json
+POST /api/datasets/masked
+{
+  "datasetName": "customer_masked",
+  "description": "Masked production-like data",
+  "schemaName": "tdms",
+  "tableName": "customer",
+  "rowLimit": 500,
+  "schemaVersion": "v1",
+  "createdBy": "nils",
+  "maskingRules": {
+    "first_name": "SUBSTITUTION",
+    "last_name": "SUBSTITUTION",
+    "email": "HASHING",
+    "age": "GENERALIZATION"
+  }
+}
+```
 
+## MySQL Setup
+A MySQL container is provided in `tdms/docker-compose.yml`.
 
-### Approaches
-- Schema-driven (tables, fields, constraints)
-- seeding
-- Deterministic & reproducible
+Start DB:
+```bash
+docker compose up -d
+```
 
-Extension Optional:
-- ai agent test data experimental
+Connection used by default:
+- host: `localhost`
+- port: `3307`
+- database: `tdms`
+- user: `tdms_user`
+- password: `tdms123`
 
-## Data Masking / Anonymization 
-Responsible for transforming real data into privacy-preserving test data.
+## SQL Schemas Included
+- Metadata schema (optional SQL-first setup):
+  - `tdms/src/main/resources/sql/tdms_metadata_schema.sql`
+- Sample source schema with demo data:
+  - `tdms/src/main/resources/sql/sample_source_schema.sql`
 
-Supported Techniques
+If you keep `spring.jpa.hibernate.ddl-auto=update`, metadata tables are auto-created.
 
-- Substitution (e.g., name → random name)
-- Pseudonymization
-- Tokenization
-- Hashing
-- Generalization (age → age group)
+## Running the Backend
+From `tdms/`:
+```bash
+./mvnw spring-boot:run
+```
 
+## Configuration
+Main config file: `tdms/src/main/resources/application.properties`
 
-## Versioning System for Test Data
+Key properties:
+- `spring.datasource.*` -> MySQL connection
+- `tdms.storage.root` -> root folder for generated dataset files
+- `tdms.storage.create-if-missing=true` -> auto-create storage path
 
-### Version Metadata
-- Dataset ID
-- Version number
-- Creation timestamp
-- Source (synthetic / masked real)
-- Generation parameters
-- Schema version
-- Author / tool version
-- etc...
-
-### Storage Concept
-Metadata in Relational DB
-- Data stored as: SQL dumpx, CSV, JSON, Object Storage
-
-
-## Privacy & GDPR Considerations
-- No raw production data stored permanently
-- Masking rules are explicit and documented
-- Separation of metadata and data
-- Privacy-by-design architecture
-- Support for data minimization
-
-
-
-## Evaluation Strategy
-
-The prototype will be evaluated based on:
-
-- Data realism
-- Test suitability
-- Privacy risk
-- Generation effort
-- Reproducibility
-
-Synthetic and masked datasets are compared using identical test scenarios.
-
-
-## Technology Stack Summary
-
-- Frontend - PWA (React)
-- Backend - Java / Spring Boot 
-- API - REST
-- Database - PostgreSQL
-- Storage - File system
-
-## Scope & Limitations
-
+## Scope and Limitations
 - Prototype, not production-ready
-- Limited dataset sizes
-- No full GDPR certification
-- Focus on concept validation
+- No RBAC or auth
+- No distributed object storage integration
+- No job queue yet (requests are processed synchronously)
 
 ## License
-
-Academic prototype – non-production use.
+Academic prototype - non-production use.
