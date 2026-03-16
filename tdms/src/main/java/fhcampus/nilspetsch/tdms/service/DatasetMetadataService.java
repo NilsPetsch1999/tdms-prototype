@@ -68,6 +68,7 @@ public class DatasetMetadataService {
         Map<String, Object> generationParameters,
         Map<String, Object> maskingRules,
         String createdBy,
+        FileFormat fileFormat,
         StoredDataFile storedDataFile
     ) {
         DatasetVersion version = new DatasetVersion();
@@ -78,7 +79,7 @@ public class DatasetMetadataService {
         version.setSchemaVersion(schemaVersion);
         version.setGenerationParametersJson(toJson(generationParameters));
         version.setMaskingRulesJson(toJson(maskingRules));
-        version.setFileFormat(FileFormat.CSV);
+        version.setFileFormat(fileFormat);
         version.setStoragePath(storedDataFile.relativePath());
         version.setChecksumSha256(storedDataFile.checksumSha256());
         version.setRowCount(storedDataFile.rowCount());
@@ -103,14 +104,30 @@ public class DatasetMetadataService {
         if (value == null || value.isEmpty()) {
             return null;
         }
-        return value.entrySet().stream()
-            .map(entry -> "\"" + escape(entry.getKey()) + "\":" + toJsonValue(entry.getValue()))
-            .collect(Collectors.joining(",", "{", "}"));
+        return toJsonValue(value);
     }
 
     private String toJsonValue(Object value) {
         if (value == null) {
             return "null";
+        }
+        if (value instanceof Map<?, ?> map) {
+            return map.entrySet().stream()
+                .map(entry -> "\"" + escape(String.valueOf(entry.getKey())) + "\":" + toJsonValue(entry.getValue()))
+                .collect(Collectors.joining(",", "{", "}"));
+        }
+        if (value instanceof Iterable<?> iterable) {
+            StringBuilder builder = new StringBuilder("[");
+            boolean first = true;
+            for (Object item : iterable) {
+                if (!first) {
+                    builder.append(",");
+                }
+                builder.append(toJsonValue(item));
+                first = false;
+            }
+            builder.append("]");
+            return builder.toString();
         }
         if (value instanceof Number || value instanceof Boolean) {
             return String.valueOf(value);

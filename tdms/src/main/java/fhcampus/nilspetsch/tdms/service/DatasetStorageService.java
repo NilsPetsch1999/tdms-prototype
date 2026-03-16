@@ -9,6 +9,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -20,6 +21,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 @Service
 public class DatasetStorageService {
@@ -47,11 +50,6 @@ public class DatasetStorageService {
         String tableName,
         List<Map<String, Object>> rows
     ) {
-        Set<String> headerSet = new LinkedHashSet<>();
-        for (Map<String, Object> row : rows) {
-            headerSet.addAll(row.keySet());
-        }
-        List<String> headers = new ArrayList<>(headerSet);
         Path relativePath = Paths.get(
             "datasets",
             "dataset-" + datasetId,
@@ -60,21 +58,42 @@ public class DatasetStorageService {
         Path absolutePath = rootPath.resolve(relativePath).normalize();
         try {
             Files.createDirectories(absolutePath.getParent());
-            try (CSVPrinter printer = new CSVPrinter(Files.newBufferedWriter(absolutePath, StandardCharsets.UTF_8), CSVFormat.DEFAULT)) {
-                printer.printRecord(headers);
-                for (Map<String, Object> row : rows) {
-                    List<String> record = new ArrayList<>();
-                    for (String header : headers) {
-                        Object value = row.get(header);
-                        record.add(value == null ? null : String.valueOf(value));
-                    }
-                    printer.printRecord(record);
-                }
-            }
+            Files.write(absolutePath, toCsvBytes(rows));
             String checksum = HashUtil.sha256Hex(Files.readAllBytes(absolutePath));
             return new StoredDataFile(relativePath.toString().replace("\\", "/"), checksum, rows.size());
         } catch (IOException e) {
             throw new IllegalStateException("Failed to write dataset CSV file.", e);
+        }
+    }
+
+    public StoredDataFile storeAsZipOfCsv(
+        Long datasetId,
+        int versionNumber,
+        String schemaName,
+        Map<String, List<Map<String, Object>>> tableRows
+    ) {
+        Path relativePath = Paths.get(
+            "datasets",
+            "dataset-" + datasetId,
+            "v" + versionNumber + "_" + schemaName + "_bundle_" + FILE_TS.format(LocalDateTime.now()) + ".zip"
+        );
+        Path absolutePath = rootPath.resolve(relativePath).normalize();
+        int totalRows = tableRows.values().stream().mapToInt(List::size).sum();
+
+        try {
+            Files.createDirectories(absolutePath.getParent());
+            try (ZipOutputStream zipOutputStream = new ZipOutputStream(Files.newOutputStream(absolutePath), StandardCharsets.UTF_8)) {
+                for (Map.Entry<String, List<Map<String, Object>>> entry : tableRows.entrySet()) {
+                    zipOutputStream.putNextEntry(new ZipEntry(entry.getKey() + ".csv"));
+                    zipOutputStream.write(toCsvBytes(entry.getValue()));
+                    zipOutputStream.closeEntry();
+                }
+            }
+
+            String checksum = HashUtil.sha256Hex(Files.readAllBytes(absolutePath));
+            return new StoredDataFile(relativePath.toString().replace("\\", "/"), checksum, totalRows);
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to write dataset ZIP bundle.", e);
         }
     }
 
@@ -84,5 +103,27 @@ public class DatasetStorageService {
             throw new IllegalArgumentException("Stored dataset file not found: " + relativePath);
         }
         return new FileSystemResource(absolutePath);
+    }
+
+    private byte[] toCsvBytes(List<Map<String, Object>> rows) throws IOException {
+        Set<String> headerSet = new LinkedHashSet<>();
+        for (Map<String, Object> row : rows) {
+            headerSet.addAll(row.keySet());
+        }
+        List<String> headers = new ArrayList<>(headerSet);
+        StringWriter stringWriter = new StringWriter();
+        try (CSVPrinter printer = new CSVPrinter(stringWriter, CSVFormat.DEFAULT)) {
+            printer.printRecord(headers);
+            for (Map<String, Object> row : rows) {
+                List<String> record = new ArrayList<>();
+                for (String header : headers) {
+                    Object value = row.get(header);
+                    record.add(value == null ? null : String.valueOf(value));
+                }
+                printer.printRecord(record);
+            }
+            printer.flush();
+        }
+        return stringWriter.toString().getBytes(StandardCharsets.UTF_8);
     }
 }

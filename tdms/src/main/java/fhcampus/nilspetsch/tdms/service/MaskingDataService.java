@@ -2,6 +2,7 @@ package fhcampus.nilspetsch.tdms.service;
 
 import fhcampus.nilspetsch.tdms.api.CreateMaskedDatasetRequest;
 import fhcampus.nilspetsch.tdms.domain.Dataset;
+import fhcampus.nilspetsch.tdms.domain.FileFormat;
 import fhcampus.nilspetsch.tdms.domain.DatasetSourceType;
 import fhcampus.nilspetsch.tdms.domain.DatasetVersion;
 import fhcampus.nilspetsch.tdms.util.HashUtil;
@@ -81,6 +82,7 @@ public class MaskingDataService {
             generationParams,
             masking,
             request.createdBy(),
+            FileFormat.CSV,
             file
         );
     }

@@ -1,6 +1,7 @@
 package fhcampus.nilspetsch.tdms.api;
 
 import fhcampus.nilspetsch.tdms.domain.DatasetVersion;
+import fhcampus.nilspetsch.tdms.domain.FileFormat;
 import fhcampus.nilspetsch.tdms.service.DatasetMetadataService;
 import fhcampus.nilspetsch.tdms.service.DatasetStorageService;
 import fhcampus.nilspetsch.tdms.service.MaskingDataService;
@@ -43,7 +44,7 @@ public class DatasetController {
     }
 
     @PostMapping("/synthetic")
-    @Operation(summary = "Generate synthetic dataset", description = "Creates a new synthetic dataset version based on a MySQL table schema.")
+    @Operation(summary = "Generate synthetic dataset", description = "Creates a new synthetic dataset version from one table, selected tables, or a full schema with foreign-key aware generation.")
     public DatasetVersionResponse createSynthetic(@Valid @RequestBody CreateSyntheticDatasetRequest request) {
         DatasetVersion version = syntheticDataService.generate(request);
         return ApiMapper.toResponse(version);
@@ -75,13 +76,15 @@ public class DatasetController {
     }
 
     @GetMapping("/{datasetId}/versions/{versionNumber}/file")
-    @Operation(summary = "Download version file", description = "Downloads the stored CSV file for a dataset version.")
+    @Operation(summary = "Download version file", description = "Downloads the stored file for a dataset version (CSV or ZIP for multi-table synthetic bundles).")
     public ResponseEntity<Resource> downloadVersionFile(@PathVariable long datasetId, @PathVariable int versionNumber) {
         DatasetVersion version = datasetMetadataService.getVersion(datasetId, versionNumber);
         Resource resource = datasetStorageService.loadAsResource(version.getStoragePath());
+        String extension = version.getFileFormat() == FileFormat.ZIP ? "zip" : "csv";
+        String contentType = version.getFileFormat() == FileFormat.ZIP ? "application/zip" : "text/csv";
         return ResponseEntity.ok()
-            .contentType(MediaType.parseMediaType("text/csv"))
-            .header("Content-Disposition", "attachment; filename=\"dataset-" + datasetId + "-v" + versionNumber + ".csv\"")
+            .contentType(MediaType.parseMediaType(contentType))
+            .header("Content-Disposition", "attachment; filename=\"dataset-" + datasetId + "-v" + versionNumber + "." + extension + "\"")
             .body(resource);
     }
 }

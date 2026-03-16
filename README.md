@@ -59,14 +59,27 @@ POST /api/datasets/synthetic
 {
   "datasetName": "customer_synth",
   "description": "Synthetic customer demo",
-  "schemaName": "tdms",
-  "tableName": "customer",
+  "schemaName": "demo",
+  "tableName": "purchase_order",
+  "tableNames": ["customer", "purchase_order"],
+  "generateWholeSchema": false,
+  "includeRelatedTables": true,
+  "useExistingParentKeys": true,
   "rowCount": 1000,
   "seed": 12345,
   "schemaVersion": "v1",
   "createdBy": "nils"
 }
 ```
+
+Notes:
+- If `generateWholeSchema=true`, all tables in the schema are generated.
+- If multiple tables are generated, the stored output is a ZIP bundle containing one CSV per table.
+- Foreign keys are respected, so child rows (for example `purchase_order.customer_id`) point to existing parent keys.
+- `rowCountByTable` can override row count per table.
+- `defaultRelatedTableRowCount` sets row count for auto-included related tables.
+- `nullableFieldProbability` controls how often nullable columns become `null` (0.0 to 1.0).
+- `excludedTableNames` can explicitly skip tables (especially useful with `generateWholeSchema=true`).
 
 ### Masked dataset
 ```json
@@ -116,6 +129,19 @@ From `tdms/`:
 ```bash
 ./mvnw spring-boot:run
 ```
+
+## Frontend (Included)
+A simple frontend is included and served by Spring Boot.
+
+Open:
+- `http://localhost:8080/`
+
+Core screens:
+- Schema Explorer: inspect schemas, tables, and columns from MySQL
+- Synthetic Generation: create synthetic dataset versions
+- Masked Dataset: define masking techniques per column and create masked versions
+- Datasets & Versions: inspect metadata, versions, checksums, and download CSV files
+- Activity: raw API responses and error logs for transparency
 
 ## Configuration
 Main config file: `tdms/src/main/resources/application.properties`

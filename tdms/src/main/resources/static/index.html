@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TDMS Prototype UI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div class="bg-orb bg-orb-a"></div>
+<div class="bg-orb bg-orb-b"></div>
+
+<header class="hero">
+    <div>
+        <p class="eyebrow">Test Data Management System</p>
+        <h1>TDMS Control Center</h1>
+        <p class="sub">
+            MySQL-only prototype for synthetic data generation, masking, and dataset versioning.
+        </p>
+    </div>
+    <div class="hero-actions">
+        <a href="/swagger-ui.html" target="_blank" rel="noopener">Swagger UI</a>
+        <a href="/api-docs" target="_blank" rel="noopener">OpenAPI JSON</a>
+    </div>
+</header>
+
+<main class="layout">
+    <section class="panel reveal">
+        <div class="panel-head">
+            <h2>Schema Explorer</h2>
+            <button id="reloadSchemasBtn" class="secondary">Reload</button>
+        </div>
+
+        <div class="form-grid">
+            <label>
+                Schema
+                <select id="schemaSelect"></select>
+            </label>
+            <label>
+                Table
+                <select id="tableSelect"></select>
+            </label>
+        </div>
+
+        <div class="inline-actions">
+            <button id="loadColumnsBtn">Load Columns</button>
+            <button id="useSelectionBtn" class="secondary">Use Selection In Forms</button>
+        </div>
+
+        <div class="table-wrap">
+            <table id="columnsTable">
+                <thead>
+                <tr>
+                    <th>Column</th>
+                    <th>Type</th>
+                    <th>Nullable</th>
+                    <th>Primary Key</th>
+                    <th>Size</th>
+                </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="panel reveal">
+        <h2>Synthetic Generation</h2>
+        <form id="syntheticForm" class="stack">
+            <div class="form-grid">
+                <label>Dataset Name<input name="datasetName" required placeholder="customer_synth"></label>
+                <label>Created By<input name="createdBy" placeholder="nils"></label>
+                <label>Schema<input name="schemaName" required></label>
+                <label>Primary Table<input name="tableName" placeholder="purchase_order"></label>
+                <label>Row Count<input name="rowCount" type="number" min="1" max="200000" value="1000" required></label>
+                <label>Seed (optional)<input name="seed" type="number" placeholder="12345"></label>
+                <label>Schema Version<input name="schemaVersion" placeholder="v1"></label>
+            </div>
+            <div class="form-grid">
+                <label><input type="checkbox" name="generateWholeSchema"> Generate Whole Schema</label>
+                <label><input type="checkbox" name="includeRelatedTables" checked> Include Related Parent Tables</label>
+                <label><input type="checkbox" name="useExistingParentKeys" checked> Reuse Existing Parent Keys</label>
+                <label>Default Related Rows<input name="defaultRelatedTableRowCount" type="number" min="1" max="200000" value="250"></label>
+                <label>Nullable Probability (0-1)<input name="nullableFieldProbability" type="number" min="0" max="1" step="0.01" value="0.05"></label>
+            </div>
+            <div class="panel-subhead">
+                <h3>Table Plan</h3>
+                <div class="inline-actions compact">
+                    <button id="addTablePlanRowBtn" type="button">+ Add Table</button>
+                    <button id="loadAllTablesPlanBtn" type="button" class="secondary">Load All Tables</button>
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table id="tablePlanTable">
+                    <thead>
+                    <tr>
+                        <th>Include</th>
+                        <th>Table</th>
+                        <th>Rows</th>
+                        <th>Action</th>
+                    </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <label>Description<textarea name="description" rows="2" placeholder="Synthetic customer dataset"></textarea></label>
+            <button type="submit">Generate Synthetic Dataset</button>
+        </form>
+    </section>
+
+    <section class="panel reveal">
+        <h2>Masked Dataset</h2>
+        <form id="maskedForm" class="stack">
+            <div class="form-grid">
+                <label>Dataset Name<input name="datasetName" required placeholder="customer_masked"></label>
+                <label>Created By<input name="createdBy" placeholder="nils"></label>
+                <label>Schema<input name="schemaName" required></label>
+                <label>Table<input name="tableName" required></label>
+                <label>Row Limit<input name="rowLimit" type="number" min="1" max="200000" value="500" required></label>
+                <label>Schema Version<input name="schemaVersion" placeholder="v1"></label>
+            </div>
+            <label>Description<textarea name="description" rows="2" placeholder="Masked production-like data"></textarea></label>
+
+            <div class="panel-subhead">
+                <h3>Masking Rules</h3>
+                <button id="loadMaskingColumnsBtn" type="button" class="secondary">Load Columns For Rules</button>
+            </div>
+
+            <div class="table-wrap">
+                <table id="maskingRulesTable">
+                    <thead>
+                    <tr>
+                        <th>Column</th>
+                        <th>Technique</th>
+                    </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <button type="submit">Create Masked Dataset</button>
+        </form>
+    </section>
+
+    <section class="panel reveal full">
+        <div class="panel-head">
+            <h2>Datasets & Versions</h2>
+            <button id="reloadDatasetsBtn" class="secondary">Reload</button>
+        </div>
+
+        <div id="datasetsContainer" class="dataset-grid"></div>
+    </section>
+
+    <section class="panel reveal full">
+        <h2>Activity</h2>
+        <pre id="activityLog"></pre>
+    </section>
+</main>
+
+<script src="/app.js"></script>
+</body>
+</html>
