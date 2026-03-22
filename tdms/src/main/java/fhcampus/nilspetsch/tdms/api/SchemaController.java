@@ -4,13 +4,16 @@ import fhcampus.nilspetsch.tdms.service.SchemaIntrospectionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/schemas")
@@ -45,5 +48,15 @@ public class SchemaController {
         return schemaIntrospectionService.listColumns(schemaName, tableName).stream()
             .map(ApiMapper::toResponse)
             .toList();
+    }
+
+    @GetMapping("/{schemaName}/tables/{tableName}/rows")
+    @Operation(summary = "Preview rows", description = "Loads sample table data from the active source connection.")
+    public List<Map<String, Object>> listRows(
+        @PathVariable @NotBlank String schemaName,
+        @PathVariable @NotBlank String tableName,
+        @RequestParam(defaultValue = "25") @Positive int limit
+    ) {
+        return schemaIntrospectionService.listRows(schemaName, tableName, limit);
     }
 }

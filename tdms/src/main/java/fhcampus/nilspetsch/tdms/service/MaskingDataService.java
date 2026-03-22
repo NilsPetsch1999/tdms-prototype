@@ -7,7 +7,6 @@ import fhcampus.nilspetsch.tdms.domain.DatasetSourceType;
 import fhcampus.nilspetsch.tdms.domain.DatasetVersion;
 import fhcampus.nilspetsch.tdms.util.HashUtil;
 import fhcampus.nilspetsch.tdms.util.IdentifierValidator;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,18 +23,18 @@ public class MaskingDataService {
 
     private static final String PSEUDO_SALT = "tdms-prototype";
 
-    private final JdbcTemplate jdbcTemplate;
+    private final SourceDatabaseConnectionService sourceDatabaseConnectionService;
     private final SchemaIntrospectionService schemaIntrospectionService;
     private final DatasetStorageService datasetStorageService;
     private final DatasetMetadataService datasetMetadataService;
 
     public MaskingDataService(
-        JdbcTemplate jdbcTemplate,
+        SourceDatabaseConnectionService sourceDatabaseConnectionService,
         SchemaIntrospectionService schemaIntrospectionService,
         DatasetStorageService datasetStorageService,
         DatasetMetadataService datasetMetadataService
     ) {
-        this.jdbcTemplate = jdbcTemplate;
+        this.sourceDatabaseConnectionService = sourceDatabaseConnectionService;
         this.schemaIntrospectionService = schemaIntrospectionService;
         this.datasetStorageService = datasetStorageService;
         this.datasetMetadataService = datasetMetadataService;
@@ -48,7 +47,7 @@ public class MaskingDataService {
         schemaIntrospectionService.listColumns(request.schemaName(), request.tableName());
 
         String selectSql = "SELECT * FROM `" + request.schemaName() + "`.`" + request.tableName() + "` LIMIT ?";
-        List<Map<String, Object>> sourceRows = jdbcTemplate.queryForList(selectSql, request.rowLimit());
+        List<Map<String, Object>> sourceRows = sourceDatabaseConnectionService.createJdbcTemplate().queryForList(selectSql, request.rowLimit());
         List<Map<String, Object>> maskedRows = sourceRows.stream().map(row -> maskRow(row, request.maskingRules())).toList();
 
         Dataset dataset = datasetMetadataService.getOrCreateDataset(

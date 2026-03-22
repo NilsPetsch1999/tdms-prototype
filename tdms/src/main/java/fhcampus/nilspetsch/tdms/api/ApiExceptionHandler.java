@@ -2,10 +2,12 @@ package fhcampus.nilspetsch.tdms.api;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.dao.DataAccessException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import jakarta.validation.ConstraintViolationException;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -28,6 +30,17 @@ public class ApiExceptionHandler {
         Map<String, Object> payload = error(HttpStatus.BAD_REQUEST, "Validation failed.");
         payload.put("fields", fields);
         return ResponseEntity.badRequest().body(payload);
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleConstraintViolation(ConstraintViolationException ex) {
+        return ResponseEntity.badRequest().body(error(HttpStatus.BAD_REQUEST, ex.getMessage()));
+    }
+
+    @ExceptionHandler(DataAccessException.class)
+    public ResponseEntity<Map<String, Object>> handleDataAccess(DataAccessException ex) {
+        String message = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : ex.getMessage();
+        return ResponseEntity.badRequest().body(error(HttpStatus.BAD_REQUEST, message));
     }
 
     @ExceptionHandler(Exception.class)

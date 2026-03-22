@@ -4,6 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TDMS Prototype UI</title>
+    <script>
+        window.__tdmsPendingAction = null;
+        window.createProject = function () {
+            if (typeof window.__tdmsCreateProjectImpl === "function") {
+                return window.__tdmsCreateProjectImpl();
+            }
+            window.__tdmsPendingAction = "createProject";
+        };
+        window.createConnection = function () {
+            if (typeof window.__tdmsCreateConnectionImpl === "function") {
+                return window.__tdmsCreateConnectionImpl();
+            }
+            window.__tdmsPendingAction = "createConnection";
+        };
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -30,6 +45,24 @@
 <main class="layout">
     <section class="panel reveal">
         <div class="panel-head">
+            <h2>Source Connection</h2>
+        </div>
+
+        <form id="sourceConnectionForm" class="stack">
+            <div class="form-grid">
+                <label>JDBC URL<input name="url" required placeholder="jdbc:mysql://localhost:3307/tdms?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"></label>
+                <label>Username<input name="username" required placeholder="tdms_user"></label>
+                <label>Password<input name="password" type="password" placeholder="tdms123"></label>
+                <label>Driver Class<input name="driverClassName" required value="com.mysql.cj.jdbc.Driver"></label>
+            </div>
+            <div class="inline-actions">
+                <button id="saveConnectionBtn" class="secondary" type="submit">Create Connection</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="panel reveal">
+        <div class="panel-head">
             <h2>Schema Explorer</h2>
             <button id="reloadSchemasBtn" class="secondary">Reload</button>
         </div>
@@ -47,6 +80,11 @@
 
         <div class="inline-actions">
             <button id="loadColumnsBtn">Load Columns</button>
+            <label>
+                Row Preview Limit
+                <input id="tableDataLimit" type="number" min="1" max="500" value="25">
+            </label>
+            <button id="loadTableDataBtn" class="secondary">Load Table Data</button>
             <button id="useSelectionBtn" class="secondary">Use Selection In Forms</button>
         </div>
 
@@ -64,6 +102,13 @@
                 <tbody></tbody>
             </table>
         </div>
+
+        <div class="table-wrap">
+            <table id="tableDataTable">
+                <thead></thead>
+                <tbody></tbody>
+            </table>
+        </div>
     </section>
 
     <section class="panel reveal">
@@ -73,7 +118,7 @@
                 <label>Dataset Name<input name="datasetName" required placeholder="customer_synth"></label>
                 <label>Created By<input name="createdBy" placeholder="nils"></label>
                 <label>Schema<input name="schemaName" required></label>
-                <label>Primary Table<input name="tableName" placeholder="purchase_order"></label>
+                <label>Primary Table<input name="tableName" placeholder="orders"></label>
                 <label>Row Count<input name="rowCount" type="number" min="1" max="200000" value="1000" required></label>
                 <label>Seed (optional)<input name="seed" type="number" placeholder="12345"></label>
                 <label>Schema Version<input name="schemaVersion" placeholder="v1"></label>
@@ -105,8 +150,32 @@
                     <tbody></tbody>
                 </table>
             </div>
+            <div class="panel-subhead">
+                <h3>Column Rules</h3>
+                <button id="loadSyntheticRulesBtn" type="button" class="secondary">Load Rules For Planned Tables</button>
+            </div>
+            <div class="table-wrap">
+                <table id="syntheticRulesTable">
+                    <thead>
+                    <tr>
+                        <th>Table</th>
+                        <th>Column</th>
+                        <th>Strategy</th>
+                        <th>Config</th>
+                    </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <label>
+                Rule help
+                <textarea rows="3" readonly>FIXED: one value | CHOICE: val1|val2|val3 | RANGE: min|max | TEMPLATE: ORD-${rowIndex} | EXPRESSION: ${quantity} * ${unit_price} | AGGREGATE: SUM(order_items.line_total BY order_id)</textarea>
+            </label>
             <label>Description<textarea name="description" rows="2" placeholder="Synthetic customer dataset"></textarea></label>
-            <button type="submit">Generate Synthetic Dataset</button>
+            <div class="inline-actions">
+                <button id="createProjectBtn" type="button">Create Project</button>
+                <button id="reloadProjectsBtn" type="button" class="secondary">Reload Projects</button>
+            </div>
         </form>
     </section>
 

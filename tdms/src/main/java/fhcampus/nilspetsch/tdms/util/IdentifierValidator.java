@@ -3,7 +3,9 @@ package fhcampus.nilspetsch.tdms.util;
 import java.util.regex.Pattern;
 
 public final class IdentifierValidator {
-    private static final Pattern IDENTIFIER = Pattern.compile("^[A-Za-z0-9_]+$");
+    // MySQL identifiers are backtick-quoted in queries, so we can safely support
+    // common characters beyond plain alphanumerics while still blocking SQL-breaking input.
+    private static final Pattern IDENTIFIER = Pattern.compile("^[A-Za-z0-9_$-]+$");
 
     private IdentifierValidator() {
     }

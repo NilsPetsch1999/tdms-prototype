@@ -1,8 +1,10 @@
 const state = {
+    sourceConnection: null,
     schemas: [],
     tables: [],
     columns: [],
-    datasets: []
+    datasets: [],
+    tableRows: []
 };
 
 const techniques = [
@@ -14,19 +16,44 @@ const techniques = [
     "GENERALIZATION"
 ];
 
+const syntheticRuleStrategies = [
+    "",
+    "FIXED",
+    "CHOICE",
+    "RANGE",
+    "TEMPLATE",
+    "EXPRESSION",
+    "AGGREGATE"
+];
+
 const els = {
+    sourceConnectionForm: document.getElementById("sourceConnectionForm"),
+    saveConnectionBtn: document.getElementById("saveConnectionBtn"),
+    createProjectBtn: document.getElementById("createProjectBtn"),
+    reloadProjectsBtn: document.getElementById("reloadProjectsBtn"),
     schemaSelect: document.getElementById("schemaSelect"),
     tableSelect: document.getElementById("tableSelect"),
+    tableDataLimit: document.getElementById("tableDataLimit"),
+    tableDataHead: document.querySelector("#tableDataTable thead"),
+    tableDataBody: document.querySelector("#tableDataTable tbody"),
     columnsTableBody: document.querySelector("#columnsTable tbody"),
     maskingRulesBody: document.querySelector("#maskingRulesTable tbody"),
     syntheticForm: document.getElementById("syntheticForm"),
     maskedForm: document.getElementById("maskedForm"),
     datasetsContainer: document.getElementById("datasetsContainer"),
     activityLog: document.getElementById("activityLog"),
-    tablePlanBody: document.querySelector("#tablePlanTable tbody")
+    tablePlanBody: document.querySelector("#tablePlanTable tbody"),
+    syntheticRulesBody: document.querySelector("#syntheticRulesTable tbody")
 };
 
+function hasElement(element) {
+    return element !== null && element !== undefined;
+}
+
 function log(message, payload) {
+    if (!hasElement(els.activityLog)) {
+        return;
+    }
     const stamp = new Date().toISOString();
     const line = `[${stamp}] ${message}`;
     if (payload !== undefined) {
@@ -50,6 +77,9 @@ async function api(path, options = {}) {
 }
 
 function fillSelect(select, values) {
+    if (!hasElement(select)) {
+        return;
+    }
     select.innerHTML = "";
     values.forEach((value) => {
         const option = document.createElement("option");
@@ -59,30 +89,96 @@ function fillSelect(select, values) {
     });
 }
 
+function setFormValues(form, values) {
+    if (!hasElement(form)) {
+        return;
+    }
+    Object.entries(values).forEach(([key, value]) => {
+        if (form.elements[key]) {
+            form.elements[key].value = value ?? "";
+        }
+    });
+}
+
+async function loadSourceConnection() {
+    if (!hasElement(els.sourceConnectionForm)) {
+        return;
+    }
+    const connection = await api("/api/source-connection");
+    state.sourceConnection = connection;
+    setFormValues(els.sourceConnectionForm, connection);
+    log("Loaded source connection", {
+        url: connection.url,
+        username: connection.username,
+        databaseProductName: connection.databaseProductName,
+        currentCatalog: connection.currentCatalog
+    });
+}
+
+async function saveSourceConnection() {
+    if (!hasElement(els.sourceConnectionForm)) {
+        throw new Error("Source connection form is not available on this page.");
+    }
+    const payload = parseForm(els.sourceConnectionForm);
+    const connection = await api("/api/source-connection", {
+        method: "PUT",
+        body: JSON.stringify(payload)
+    });
+    state.sourceConnection = connection;
+    log("Updated source connection", {
+        url: connection.url,
+        username: connection.username,
+        databaseProductName: connection.databaseProductName,
+        currentCatalog: connection.currentCatalog
+    });
+    await loadSchemas();
+    await loadDatasets();
+}
+
 async function loadSchemas() {
+    if (!hasElement(els.schemaSelect)) {
+        return;
+    }
     const schemas = await api("/api/schemas");
     state.schemas = schemas;
     fillSelect(els.schemaSelect, schemas);
     log("Loaded schemas", schemas);
     if (schemas.length) {
         await loadTables(schemas[0]);
+        applySchemaTableToForms();
+    } else {
+        state.tables = [];
+        state.columns = [];
+        state.tableRows = [];
+        fillSelect(els.tableSelect, []);
+        renderColumns([]);
+        renderMaskingRules([]);
+        renderTableRows([]);
+        applySchemaTableToForms();
     }
 }
 
 async function loadTables(schemaName) {
-    if (!schemaName) return;
+    if (!schemaName || !hasElement(els.tableSelect)) return;
     const tables = await api(`/api/schemas/${encodeURIComponent(schemaName)}/tables`);
     state.tables = tables;
     fillSelect(els.tableSelect, tables);
     log(`Loaded tables for schema ${schemaName}`, tables);
     if (tables.length) {
         await loadColumns(schemaName, tables[0]);
+        await loadTableRows(schemaName, tables[0]);
         refreshTablePlanTableOptions();
+        applySchemaTableToForms();
     } else {
         state.columns = [];
+        state.tableRows = [];
         renderColumns([]);
+        renderTableRows([]);
         renderMaskingRules([]);
-        els.tablePlanBody.innerHTML = "";
+        if (hasElement(els.tablePlanBody)) {
+            els.tablePlanBody.innerHTML = "";
+        }
+        applySchemaTableToForms();
     }
 }
 
@@ -92,10 +188,26 @@ async function loadColumns(schemaName, tableName) {
     state.columns = columns;
     renderColumns(columns);
     renderMaskingRules(columns);
+    applySchemaTableToForms();
     log(`Loaded columns for ${schemaName}.${tableName}`, columns);
 }
 
+async function loadTableRows(schemaName, tableName) {
+    if (!schemaName || !tableName) return;
+    const limit = Number(els.tableDataLimit?.value || 25);
+    const rows = await api(`/api/schemas/${encodeURIComponent(schemaName)}/tables/${encodeURIComponent(tableName)}/rows?limit=${encodeURIComponent(limit)}`);
+    state.tableRows = rows;
+    renderTableRows(rows);
+    log(`Loaded table data for ${schemaName}.${tableName}`, {
+        rowCount: rows.length,
+        columns: rows[0] ? Object.keys(rows[0]) : []
+    });
+}
+
 function renderColumns(columns) {
+    if (!hasElement(els.columnsTableBody)) {
+        return;
+    }
     els.columnsTableBody.innerHTML = "";
     columns.forEach((col) => {
         const tr = document.createElement("tr");
@@ -111,6 +223,9 @@ function renderColumns(columns) {
 }
 
 function renderMaskingRules(columns) {
+    if (!hasElement(els.maskingRulesBody)) {
+        return;
+    }
     els.maskingRulesBody.innerHTML = "";
     columns.forEach((col) => {
         const tr = document.createElement("tr");
@@ -132,19 +247,63 @@ function renderMaskingRules(columns) {
     });
 }
 
+function renderTableRows(rows) {
+    if (!hasElement(els.tableDataHead) || !hasElement(els.tableDataBody)) {
+        return;
+    }
+    els.tableDataHead.innerHTML = "";
+    els.tableDataBody.innerHTML = "";
+    if (!rows.length) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td colspan="1">No table data loaded.</td>`;
+        els.tableDataBody.appendChild(tr);
+        return;
+    }
+
+    const columns = Object.keys(rows[0]);
+    const headRow = document.createElement("tr");
+    columns.forEach((column) => {
+        const th = document.createElement("th");
+        th.textContent = column;
+        headRow.appendChild(th);
+    });
+    els.tableDataHead.appendChild(headRow);
+
+    rows.forEach((row) => {
+        const tr = document.createElement("tr");
+        columns.forEach((column) => {
+            const td = document.createElement("td");
+            const value = row[column];
+            td.textContent = value === null || value === undefined ? "" : String(value);
+            tr.appendChild(td);
+        });
+        els.tableDataBody.appendChild(tr);
+    });
+}
+
 function applySchemaTableToForms() {
+    if (!hasElement(els.schemaSelect) || !hasElement(els.tableSelect)) {
+        return;
+    }
     const schemaName = els.schemaSelect.value;
     const tableName = els.tableSelect.value;
-    els.syntheticForm.elements.schemaName.value = schemaName;
-    els.syntheticForm.elements.tableName.value = tableName;
-    els.maskedForm.elements.schemaName.value = schemaName;
-    els.maskedForm.elements.tableName.value = tableName;
-    if (!els.tablePlanBody.children.length && tableName) {
+    if (hasElement(els.syntheticForm)) {
+        els.syntheticForm.elements.schemaName.value = schemaName;
+        els.syntheticForm.elements.tableName.value = tableName;
+    }
+    if (hasElement(els.maskedForm)) {
+        els.maskedForm.elements.schemaName.value = schemaName;
+        els.maskedForm.elements.tableName.value = tableName;
+    }
+    if (hasElement(els.tablePlanBody) && hasElement(els.syntheticForm) && !els.tablePlanBody.children.length && tableName) {
         addTablePlanRow({ include: true, tableName, rows: Number(els.syntheticForm.elements.rowCount.value || 1000) });
     }
 }
 
 function parseForm(form) {
+    if (!hasElement(form)) {
+        return {};
+    }
     const values = Object.fromEntries(new FormData(form).entries());
     Object.keys(values).forEach((k) => {
         if (values[k] === "") {
@@ -155,6 +314,9 @@ function parseForm(form) {
 }
 
 function collectMaskingRules() {
+    if (!hasElement(els.maskingRulesBody)) {
+        return {};
+    }
     const rules = {};
     els.maskingRulesBody.querySelectorAll("select").forEach((select) => {
         if (select.value) {
@@ -164,7 +326,125 @@ function collectMaskingRules() {
     return rules;
 }
 
+function collectSyntheticRules() {
+    if (!hasElement(els.syntheticRulesBody)) {
+        return {};
+    }
+    const rulesByTable = {};
+    els.syntheticRulesBody.querySelectorAll("tr").forEach((tr) => {
+        const strategy = tr.querySelector(".rule-strategy").value;
+        const config = tr.querySelector(".rule-config").value.trim();
+        if (!strategy) return;
+        const tableName = tr.dataset.tableName;
+        const columnName = tr.dataset.columnName;
+        if (!rulesByTable[tableName]) {
+            rulesByTable[tableName] = {};
+        }
+        rulesByTable[tableName][columnName] = { strategy, config };
+    });
+    return rulesByTable;
+}
+
+function rulePlaceholder(strategy) {
+    switch (strategy) {
+        case "FIXED":
+            return "e.g. PAID";
+        case "CHOICE":
+            return "e.g. NEW|PAID|SHIPPED";
+        case "RANGE":
+            return "e.g. 10|500 or 2024-01-01|2024-12-31";
+        case "TEMPLATE":
+            return "e.g. ORD-${rowIndex}";
+        case "EXPRESSION":
+            return "e.g. ${quantity} * ${unit_price}";
+        case "AGGREGATE":
+            return "e.g. SUM(order_items.line_total BY order_id)";
+        default:
+            return "Config";
+    }
+}
+
+function createStrategySelect(selected) {
+    const select = document.createElement("select");
+    select.className = "rule-strategy";
+    syntheticRuleStrategies.forEach((strategy) => {
+        const option = document.createElement("option");
+        option.value = strategy;
+        option.textContent = strategy || "DEFAULT";
+        if (strategy === selected) {
+            option.selected = true;
+        }
+        select.appendChild(option);
+    });
+    return select;
+}
+
+function renderSyntheticRules(tableDefinitions, existingRules = {}) {
+    if (!hasElement(els.syntheticRulesBody)) {
+        return;
+    }
+    els.syntheticRulesBody.innerHTML = "";
+    tableDefinitions.forEach(({ tableName, columns }) => {
+        columns.forEach((column) => {
+            const rule = existingRules[tableName]?.[column.columnName] || {};
+            const tr = document.createElement("tr");
+            tr.dataset.tableName = tableName;
+            tr.dataset.columnName = column.columnName;
+
+            const tableTd = document.createElement("td");
+            tableTd.textContent = tableName;
+
+            const columnTd = document.createElement("td");
+            columnTd.textContent = column.columnName;
+
+            const strategyTd = document.createElement("td");
+            const strategySelect = createStrategySelect(rule.strategy || "");
+            strategyTd.appendChild(strategySelect);
+
+            const configTd = document.createElement("td");
+            const configInput = document.createElement("input");
+            configInput.className = "rule-config";
+            configInput.value = rule.config || "";
+            configInput.placeholder = rulePlaceholder(strategySelect.value);
+            strategySelect.addEventListener("change", () => {
+                configInput.placeholder = rulePlaceholder(strategySelect.value);
+            });
+            configTd.appendChild(configInput);
+
+            tr.appendChild(tableTd);
+            tr.appendChild(columnTd);
+            tr.appendChild(strategyTd);
+            tr.appendChild(configTd);
+            els.syntheticRulesBody.appendChild(tr);
+        });
+    });
+}
+
+async function loadSyntheticRulesForPlan() {
+    if (!hasElement(els.syntheticForm) || !hasElement(els.syntheticRulesBody)) {
+        return;
+    }
+    const schemaName = els.syntheticForm.elements.schemaName.value;
+    const existingRules = collectSyntheticRules();
+    const plan = collectTablePlanPayload();
+    const tables = (plan.included.length ? plan.included : [els.syntheticForm.elements.tableName.value]).filter(Boolean);
+    const uniqueTables = [...new Set(tables)];
+    const definitions = [];
+    for (const tableName of uniqueTables) {
+        const columns = await api(`/api/schemas/${encodeURIComponent(schemaName)}/tables/${encodeURIComponent(tableName)}/columns`);
+        definitions.push({ tableName, columns });
+    }
+    renderSyntheticRules(definitions, existingRules);
+    log("Loaded synthetic column rules", definitions.map((entry) => ({
+        tableName: entry.tableName,
+        columns: entry.columns.map((column) => column.columnName)
+    })));
+}
+
 function addTablePlanRow(initial = {}) {
+    if (!hasElement(els.tablePlanBody) || !hasElement(els.syntheticForm)) {
+        return;
+    }
     const tr = document.createElement("tr");
 
     const includeTd = document.createElement("td");
@@ -212,6 +492,9 @@ function addTablePlanRow(initial = {}) {
 }
 
 function refreshTablePlanTableOptions() {
+    if (!hasElement(els.tablePlanBody)) {
+        return;
+    }
     els.tablePlanBody.querySelectorAll("tr").forEach((tr) => {
         const select = tr.querySelector("select");
         if (!select) return;
@@ -230,6 +513,9 @@ function refreshTablePlanTableOptions() {
 }
 
 function collectTablePlanPayload() {
+    if (!hasElement(els.tablePlanBody)) {
+        return { included: [], excluded: [], rowCountByTable: {} };
+    }
     const included = [];
     const excluded = [];
     const rowCountByTable = {};
@@ -254,6 +540,9 @@ function collectTablePlanPayload() {
 
 async function submitSynthetic(event) {
     event.preventDefault();
+    if (!hasElement(els.syntheticForm)) {
+        throw new Error("Synthetic form is not available on this page.");
+    }
     const payload = parseForm(els.syntheticForm);
     payload.rowCount = Number(payload.rowCount);
     if (payload.seed !== null) payload.seed = Number(payload.seed);
@@ -270,6 +559,8 @@ async function submitSynthetic(event) {
     payload.tableNames = plan.included;
     payload.excludedTableNames = plan.excluded;
     payload.rowCountByTable = plan.rowCountByTable;
+    const columnRulesByTable = collectSyntheticRules();
+    payload.columnRulesByTable = Object.keys(columnRulesByTable).length ? columnRulesByTable : null;
     if (!payload.tableName && payload.tableNames.length) {
         payload.tableName = payload.tableNames[0];
     }
@@ -285,6 +576,9 @@ async function submitSynthetic(event) {
 
 async function submitMasked(event) {
     event.preventDefault();
+    if (!hasElement(els.maskedForm)) {
+        throw new Error("Masked form is not available on this page.");
+    }
     const payload = parseForm(els.maskedForm);
     payload.rowLimit = Number(payload.rowLimit);
     payload.maskingRules = collectMaskingRules();
@@ -304,6 +598,9 @@ async function loadDatasets() {
 }
 
 function renderDatasets(datasets) {
+    if (!hasElement(els.datasetsContainer)) {
+        return;
+    }
     els.datasetsContainer.innerHTML = "";
     if (!datasets.length) {
         els.datasetsContainer.innerHTML = "<p>No datasets yet.</p>";
@@ -368,47 +665,243 @@ async function loadVersions(datasetId, chipContainer, detailsContainer) {
 }
 
 function bindEvents() {
-    document.getElementById("reloadSchemasBtn").addEventListener("click", () => loadSchemas().catch(handleError));
-    document.getElementById("reloadDatasetsBtn").addEventListener("click", () => loadDatasets().catch(handleError));
-    document.getElementById("loadColumnsBtn").addEventListener("click", () => {
-        loadColumns(els.schemaSelect.value, els.tableSelect.value).catch(handleError);
-    });
-    document.getElementById("useSelectionBtn").addEventListener("click", applySchemaTableToForms);
-    document.getElementById("addTablePlanRowBtn").addEventListener("click", () => {
-        addTablePlanRow({ include: true, tableName: els.tableSelect.value, rows: Number(els.syntheticForm.elements.rowCount.value || 1000) });
-    });
-    document.getElementById("loadAllTablesPlanBtn").addEventListener("click", () => {
-        els.tablePlanBody.innerHTML = "";
-        state.tables.forEach((table) => addTablePlanRow({ include: true, tableName: table, rows: Number(els.syntheticForm.elements.rowCount.value || 1000) }));
-    });
-    document.getElementById("loadMaskingColumnsBtn").addEventListener("click", () => {
-        const schemaName = els.maskedForm.elements.schemaName.value;
-        const tableName = els.maskedForm.elements.tableName.value;
-        loadColumns(schemaName, tableName).catch(handleError);
-    });
+    if (hasElement(els.sourceConnectionForm)) {
+        els.sourceConnectionForm.addEventListener("submit", (event) => {
+            event.preventDefault();
+            saveSourceConnection().catch(handleError);
+        });
+    }
 
-    els.schemaSelect.addEventListener("change", () => {
-        loadTables(els.schemaSelect.value).catch(handleError);
-    });
-    els.tableSelect.addEventListener("change", () => {
-        loadColumns(els.schemaSelect.value, els.tableSelect.value).catch(handleError);
-    });
+    const reloadSchemasBtn = document.getElementById("reloadSchemasBtn");
+    if (reloadSchemasBtn) {
+        reloadSchemasBtn.addEventListener("click", () => loadSchemas().catch(handleError));
+    }
 
-    els.syntheticForm.addEventListener("submit", (event) => {
-        submitSynthetic(event).catch(handleError);
-    });
-    els.maskedForm.addEventListener("submit", (event) => {
-        submitMasked(event).catch(handleError);
+    const reloadDatasetsBtn = document.getElementById("reloadDatasetsBtn");
+    if (reloadDatasetsBtn) {
+        reloadDatasetsBtn.addEventListener("click", () => loadDatasets().catch(handleError));
+    }
+
+    if (hasElement(els.reloadProjectsBtn)) {
+        els.reloadProjectsBtn.addEventListener("click", () => loadDatasets().catch(handleError));
+    }
+
+    const loadColumnsBtn = document.getElementById("loadColumnsBtn");
+    if (loadColumnsBtn) {
+        loadColumnsBtn.addEventListener("click", () => {
+            loadColumns(els.schemaSelect?.value, els.tableSelect?.value).catch(handleError);
+        });
+    }
+
+    const loadTableDataBtn = document.getElementById("loadTableDataBtn");
+    if (loadTableDataBtn) {
+        loadTableDataBtn.addEventListener("click", () => {
+            loadTableRows(els.schemaSelect?.value, els.tableSelect?.value).catch(handleError);
+        });
+    }
+
+    const useSelectionBtn = document.getElementById("useSelectionBtn");
+    if (useSelectionBtn) {
+        useSelectionBtn.addEventListener("click", applySchemaTableToForms);
+    }
+
+    const addTablePlanRowBtn = document.getElementById("addTablePlanRowBtn");
+    if (addTablePlanRowBtn) {
+        addTablePlanRowBtn.addEventListener("click", () => {
+            addTablePlanRow({ include: true, tableName: els.tableSelect?.value, rows: Number(els.syntheticForm?.elements.rowCount.value || 1000) });
+        });
+    }
+
+    const loadAllTablesPlanBtn = document.getElementById("loadAllTablesPlanBtn");
+    if (loadAllTablesPlanBtn) {
+        loadAllTablesPlanBtn.addEventListener("click", () => {
+            if (hasElement(els.tablePlanBody)) {
+                els.tablePlanBody.innerHTML = "";
+            }
+            state.tables.forEach((table) => addTablePlanRow({ include: true, tableName: table, rows: Number(els.syntheticForm?.elements.rowCount.value || 1000) }));
+        });
+    }
+
+    const loadSyntheticRulesBtn = document.getElementById("loadSyntheticRulesBtn");
+    if (loadSyntheticRulesBtn) {
+        loadSyntheticRulesBtn.addEventListener("click", () => {
+            loadSyntheticRulesForPlan().catch(handleError);
+        });
+    }
+
+    const loadMaskingColumnsBtn = document.getElementById("loadMaskingColumnsBtn");
+    if (loadMaskingColumnsBtn && hasElement(els.maskedForm)) {
+        loadMaskingColumnsBtn.addEventListener("click", () => {
+            const schemaName = els.maskedForm.elements.schemaName.value;
+            const tableName = els.maskedForm.elements.tableName.value;
+            loadColumns(schemaName, tableName).catch(handleError);
+        });
+    }
+
+    if (hasElement(els.schemaSelect)) {
+        els.schemaSelect.addEventListener("change", () => {
+            loadTables(els.schemaSelect.value).catch(handleError);
+        });
+    }
+
+    if (hasElement(els.tableSelect)) {
+        els.tableSelect.addEventListener("change", () => {
+            loadColumns(els.schemaSelect?.value, els.tableSelect.value).catch(handleError);
+            loadTableRows(els.schemaSelect?.value, els.tableSelect.value).catch(handleError);
+        });
+    }
+
+    if (hasElement(els.syntheticForm)) {
+        els.syntheticForm.addEventListener("submit", (event) => {
+            submitSynthetic(event).catch(handleError);
+        });
+    }
+
+    if (hasElement(els.maskedForm)) {
+        els.maskedForm.addEventListener("submit", (event) => {
+            submitMasked(event).catch(handleError);
+        });
+    }
+
+    document.addEventListener("click", (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) {
+            return;
+        }
+
+        const label = (target.textContent || "").trim().toLowerCase();
+        const id = target.id || "";
+
+        if (id === "createProjectBtn" || id === "createProject" || label === "create project") {
+            event.preventDefault();
+            window.createProject().catch(handleError);
+            return;
+        }
+
+        if (id === "reloadProjectsBtn" || id === "reloadProjectBtn" || label === "reload projects" || label === "reload project") {
+            event.preventDefault();
+            loadDatasets().catch(handleError);
+        }
     });
 }
 
 function handleError(error) {
+    if (typeof console !== "undefined" && console.error) {
+        console.error(error);
+    }
     log(`ERROR: ${error.message}`);
+}
+
+function getValueByCandidates(candidates) {
+    for (const candidate of candidates) {
+        const byId = document.getElementById(candidate);
+        if (byId && typeof byId.value !== "undefined" && String(byId.value).trim() !== "") {
+            return String(byId.value).trim();
+        }
+        const byName = document.querySelector(`[name="${candidate}"]`);
+        if (byName && typeof byName.value !== "undefined" && String(byName.value).trim() !== "") {
+            return String(byName.value).trim();
+        }
+    }
+    return null;
+}
+
+async function submitSyntheticCompatibilityPayload(payload) {
+    const result = await api("/api/datasets/synthetic", {
+        method: "POST",
+        body: JSON.stringify(payload)
+    });
+    log("Synthetic dataset version created", result);
+    await loadDatasets();
+    return result;
+}
+
+// Compatibility shim for older cached HTML that still uses inline onclick="createProject()".
+window.__tdmsCreateProjectImpl = async function createProject() {
+    try {
+        if (hasElement(els.syntheticForm)) {
+            if (!els.syntheticForm.reportValidity()) {
+                throw new Error("Please fill in the required project fields first.");
+            }
+            const payload = parseForm(els.syntheticForm);
+            payload.rowCount = Number(payload.rowCount);
+            if (payload.seed !== null) payload.seed = Number(payload.seed);
+            if (payload.defaultRelatedTableRowCount !== null) {
+                payload.defaultRelatedTableRowCount = Number(payload.defaultRelatedTableRowCount);
+            }
+            if (payload.nullableFieldProbability !== null) {
+                payload.nullableFieldProbability = Number(payload.nullableFieldProbability);
+            }
+            payload.generateWholeSchema = !!els.syntheticForm.elements.generateWholeSchema?.checked;
+            payload.includeRelatedTables = els.syntheticForm.elements.includeRelatedTables?.checked ?? true;
+            payload.useExistingParentKeys = els.syntheticForm.elements.useExistingParentKeys?.checked ?? true;
+            const plan = collectTablePlanPayload();
+            payload.tableNames = plan.included;
+            payload.excludedTableNames = plan.excluded;
+            payload.rowCountByTable = plan.rowCountByTable;
+            const columnRulesByTable = collectSyntheticRules();
+            payload.columnRulesByTable = Object.keys(columnRulesByTable).length ? columnRulesByTable : null;
+            if (!payload.tableName && payload.tableNames.length) {
+                payload.tableName = payload.tableNames[0];
+            }
+            return await submitSyntheticCompatibilityPayload(payload);
+        }
+
+        const payload = {
+            datasetName: getValueByCandidates(["datasetName", "projectName", "name"]),
+            description: getValueByCandidates(["description", "projectDescription"]),
+            schemaName: getValueByCandidates(["schemaName", "schema"]),
+            tableName: getValueByCandidates(["tableName", "table", "primaryTable"]),
+            rowCount: Number(getValueByCandidates(["rowCount", "rows", "projectRowCount"]) || 1000),
+            schemaVersion: getValueByCandidates(["schemaVersion"]),
+            createdBy: getValueByCandidates(["createdBy", "owner", "user"]),
+            generateWholeSchema: false,
+            includeRelatedTables: true,
+            useExistingParentKeys: true,
+            tableNames: [],
+            excludedTableNames: [],
+            rowCountByTable: null,
+            columnRulesByTable: null,
+            seed: null,
+            defaultRelatedTableRowCount: null,
+            nullableFieldProbability: null
+        };
+
+        if (!payload.datasetName || !payload.schemaName || !payload.tableName) {
+            throw new Error("Project creation requires dataset/project name, schema name, and table name.");
+        }
+
+        return await submitSyntheticCompatibilityPayload(payload);
+    } catch (error) {
+        handleError(error);
+        throw error;
+    }
+};
+window.createProject = window.__tdmsCreateProjectImpl;
+
+window.__tdmsCreateConnectionImpl = function createConnection() {
+    saveSourceConnection().catch(handleError);
+};
+window.createConnection = window.__tdmsCreateConnectionImpl;
+
+if (window.__tdmsPendingAction === "createProject") {
+    window.__tdmsPendingAction = null;
+    window.createProject().catch(handleError);
+}
+
+if (window.__tdmsPendingAction === "createConnection") {
+    window.__tdmsPendingAction = null;
+    window.createConnection();
 }
 
 async function init() {
     bindEvents();
     try {
+        try {
+            await loadSourceConnection();
+        } catch (error) {
+            log(`Source connection endpoint unavailable: ${error.message}`);
+        }
         await loadSchemas();
         applySchemaTableToForms();
         if (!els.tablePlanBody.children.length && state.tables.length) {

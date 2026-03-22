@@ -1,23 +1,23 @@
 package fhcampus.nilspetsch.tdms.service;
 
 import fhcampus.nilspetsch.tdms.util.IdentifierValidator;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class SchemaIntrospectionService {
 
-    private final JdbcTemplate jdbcTemplate;
+    private final SourceDatabaseConnectionService sourceDatabaseConnectionService;
 
-    public SchemaIntrospectionService(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public SchemaIntrospectionService(SourceDatabaseConnectionService sourceDatabaseConnectionService) {
+        this.sourceDatabaseConnectionService = sourceDatabaseConnectionService;
     }
 
     public List<String> listSchemas() {
-        return jdbcTemplate.queryForList(
+        return sourceDatabaseConnectionService.createJdbcTemplate().queryForList(
             """
                 SELECT schema_name
                 FROM information_schema.schemata
@@ -30,7 +30,7 @@ public class SchemaIntrospectionService {
 
     public List<String> listTables(String schemaName) {
         IdentifierValidator.requireValid(schemaName, "schemaName");
-        return jdbcTemplate.queryForList(
+        return sourceDatabaseConnectionService.createJdbcTemplate().queryForList(
             """
                 SELECT table_name
                 FROM information_schema.tables
@@ -46,7 +46,7 @@ public class SchemaIntrospectionService {
     public List<SchemaColumnMeta> listColumns(String schemaName, String tableName) {
         IdentifierValidator.requireValid(schemaName, "schemaName");
         IdentifierValidator.requireValid(tableName, "tableName");
-        List<SchemaColumnMeta> columns = jdbcTemplate.query(
+        List<SchemaColumnMeta> columns = sourceDatabaseConnectionService.createJdbcTemplate().query(
             """
                 SELECT column_name,
                        data_type,
@@ -81,7 +81,7 @@ public class SchemaIntrospectionService {
     public List<String> listPrimaryKeyColumns(String schemaName, String tableName) {
         IdentifierValidator.requireValid(schemaName, "schemaName");
         IdentifierValidator.requireValid(tableName, "tableName");
-        return jdbcTemplate.queryForList(
+        return sourceDatabaseConnectionService.createJdbcTemplate().queryForList(
             """
                 SELECT column_name
                 FROM information_schema.columns
@@ -98,7 +98,7 @@ public class SchemaIntrospectionService {
 
     public List<ForeignKeyMeta> listForeignKeys(String schemaName) {
         IdentifierValidator.requireValid(schemaName, "schemaName");
-        return jdbcTemplate.query(
+        return sourceDatabaseConnectionService.createJdbcTemplate().query(
             """
                 SELECT kcu.table_name AS child_table,
                        kcu.column_name AS child_column,
@@ -124,7 +124,15 @@ public class SchemaIntrospectionService {
         IdentifierValidator.requireValid(tableName, "tableName");
         IdentifierValidator.requireValid(columnName, "columnName");
         String sql = "SELECT DISTINCT `" + columnName + "` FROM `" + schemaName + "`.`" + tableName + "` WHERE `" + columnName + "` IS NOT NULL LIMIT ?";
-        return new ArrayList<>(jdbcTemplate.queryForList(sql, Object.class, limit));
+        return new ArrayList<>(sourceDatabaseConnectionService.createJdbcTemplate().queryForList(sql, Object.class, limit));
+    }
+
+    public List<Map<String, Object>> listRows(String schemaName, String tableName, int limit) {
+        IdentifierValidator.requireValid(schemaName, "schemaName");
+        IdentifierValidator.requireValid(tableName, "tableName");
+        int safeLimit = Math.max(1, Math.min(limit, 500));
+        String sql = "SELECT * FROM `" + schemaName + "`.`" + tableName + "` LIMIT ?";
+        return sourceDatabaseConnectionService.createJdbcTemplate().queryForList(sql, safeLimit);
     }
 
     private Integer toInteger(Object value) {

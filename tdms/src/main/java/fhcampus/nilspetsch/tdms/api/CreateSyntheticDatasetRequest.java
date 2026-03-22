@@ -23,6 +23,7 @@ public record CreateSyntheticDatasetRequest(
     Double nullableFieldProbability,
     Long seed,
     String schemaVersion,
+    Map<String, Map<String, SyntheticColumnRule>> columnRulesByTable,
     String createdBy
 ) {
 }
