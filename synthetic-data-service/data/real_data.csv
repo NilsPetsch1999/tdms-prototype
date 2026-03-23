@@ -1,0 +1,13 @@
+customer_id,region,signup_date,is_active,spend_total,plan_type
+1001,North,2024-01-10,true,120.50,Basic
+1002,South,2024-01-12,false,89.99,Premium
+1003,East,2024-01-15,true,210.00,Standard
+1004,West,2024-01-20,true,45.25,Basic
+1005,North,2024-01-22,false,310.10,Premium
+1006,South,2024-01-25,true,77.70,Standard
+1007,East,2024-02-01,true,132.40,Basic
+1008,West,2024-02-03,false,156.80,Premium
+1009,North,2024-02-08,true,98.35,Standard
+1010,South,2024-02-11,true,205.90,Premium
+1011,East,2024-02-15,false,64.10,Basic
+1012,West,2024-02-18,true,140.00,Standard

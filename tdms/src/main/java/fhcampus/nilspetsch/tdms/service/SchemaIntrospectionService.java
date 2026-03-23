@@ -127,9 +127,13 @@ public class SchemaIntrospectionService {
         return new ArrayList<>(sourceDatabaseConnectionService.createJdbcTemplate().queryForList(sql, Object.class, limit));
     }
 
-    public List<Map<String, Object>> listRows(String schemaName, String tableName, int limit) {
+    public List<Map<String, Object>> listRows(String schemaName, String tableName, Integer limit) {
         IdentifierValidator.requireValid(schemaName, "schemaName");
         IdentifierValidator.requireValid(tableName, "tableName");
+        if (limit == null) {
+            String sql = "SELECT * FROM `" + schemaName + "`.`" + tableName + "`";
+            return sourceDatabaseConnectionService.createJdbcTemplate().queryForList(sql);
+        }
         int safeLimit = Math.max(1, Math.min(limit, 500));
         String sql = "SELECT * FROM `" + schemaName + "`.`" + tableName + "` LIMIT ?";
         return sourceDatabaseConnectionService.createJdbcTemplate().queryForList(sql, safeLimit);

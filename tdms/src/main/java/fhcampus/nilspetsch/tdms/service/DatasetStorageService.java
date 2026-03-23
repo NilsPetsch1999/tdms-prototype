@@ -14,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -103,6 +104,31 @@ public class DatasetStorageService {
             throw new IllegalArgumentException("Stored dataset file not found: " + relativePath);
         }
         return new FileSystemResource(absolutePath);
+    }
+
+    public Path storeWorkingCsv(
+        String schemaName,
+        String tableName,
+        String purpose,
+        List<Map<String, Object>> rows
+    ) {
+        Path workingDirectory = rootPath.resolve(Paths.get("working", "python-bridge")).normalize();
+        Path filePath = workingDirectory.resolve(
+            purpose + "_" + schemaName + "_" + tableName + "_" + FILE_TS.format(LocalDateTime.now()) + ".csv"
+        );
+        try {
+            Files.createDirectories(workingDirectory);
+            Files.write(
+                filePath,
+                toCsvBytes(rows),
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING,
+                StandardOpenOption.WRITE
+            );
+            return filePath;
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to write working CSV file.", e);
+        }
     }
 
     private byte[] toCsvBytes(List<Map<String, Object>> rows) throws IOException {

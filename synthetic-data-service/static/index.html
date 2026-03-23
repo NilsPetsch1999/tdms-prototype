@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Synthetic Data Model Training</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        form { margin-bottom: 20px; padding: 10px; border: 1px solid #ccc; }
+        input, button { margin: 5px; }
+        #status { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Synthetic Data Model Training</h1>
+
+    <h2>Upload CSV Data</h2>
+    <form id="uploadForm" enctype="multipart/form-data">
+        <input type="file" name="file" accept=".csv" required>
+        <button type="submit">Upload CSV</button>
+    </form>
+
+    <h2>Train Model</h2>
+    <form id="trainForm">
+        <label>Data Path (leave empty for default or uploaded):</label>
+        <input type="text" name="data_path" placeholder="e.g., data/uploaded.csv">
+        <label>Desired Output Rows (for generation, not training):</label>
+        <input type="number" name="num_rows" value="100" min="1">
+        <button type="submit">Train Model</button>
+    </form>
+
+    <h2>Generate Synthetic Data</h2>
+    <form id="generateForm">
+        <label>Number of Rows:</label>
+        <input type="number" name="num_rows" value="100" min="1" required>
+        <label>Randomize Seed:</label>
+        <input type="checkbox" name="randomize_seed">
+        <button type="submit">Generate</button>
+    </form>
+    <div id="downloadLink" style="margin-top: 10px;"></div>
+    <pre id="generatedData"></pre>
+
+    <h2>Delete Current Model</h2>
+    <form id="deleteForm">
+        <button type="submit">Delete Model</button>
+    </form>
+
+    <div id="status"></div>
+
+    <script>
+        const api = async (path, options = {}) => {
+            const response = await fetch(path, options);
+            if (!response.ok) throw new Error(await response.text());
+            return response.json();
+        };
+
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            try {
+                const result = await fetch('/upload', { method: 'POST', body: formData });
+                const data = await result.json();
+                document.getElementById('status').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('status').textContent = 'Error: ' + error.message;
+            }
+        });
+
+        document.getElementById('trainForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const payload = {
+                data_path: formData.get('data_path') || null,
+                save_model: true
+            };
+            try {
+                const result = await api('/train', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                document.getElementById('status').textContent = JSON.stringify(result, null, 2);
+            } catch (error) {
+                document.getElementById('status').textContent = 'Error: ' + error.message;
+            }
+        });
+
+        document.getElementById('generateForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const payload = {
+                num_rows: parseInt(formData.get('num_rows')),
+                randomize_seed: formData.has('randomize_seed')
+            };
+            try {
+                const result = await api('/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                document.getElementById('generatedData').textContent = JSON.stringify(result.data, null, 2);
+                document.getElementById('downloadLink').innerHTML = `<a href="/download/${result.filename}" target="_blank">Download JSON: ${result.filename}</a>`;
+                document.getElementById('status').textContent = 'Generated successfully';
+            } catch (error) {
+                document.getElementById('status').textContent = 'Error: ' + error.message;
+            }
+        });
+
+        document.getElementById('deleteForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            try {
+                const result = await api('/delete', { method: 'POST' });
+                document.getElementById('status').textContent = JSON.stringify(result, null, 2);
+            } catch (error) {
+                document.getElementById('status').textContent = 'Error: ' + error.message;
+            }
+        });
+    </script>
+</body>
+</html>

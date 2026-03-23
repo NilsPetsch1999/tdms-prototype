@@ -5,6 +5,7 @@ import fhcampus.nilspetsch.tdms.domain.FileFormat;
 import fhcampus.nilspetsch.tdms.service.DatasetMetadataService;
 import fhcampus.nilspetsch.tdms.service.DatasetStorageService;
 import fhcampus.nilspetsch.tdms.service.MaskingDataService;
+import fhcampus.nilspetsch.tdms.service.PythonSyntheticDataService;
 import fhcampus.nilspetsch.tdms.service.SyntheticDataService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -27,17 +28,20 @@ import java.util.List;
 public class DatasetController {
 
     private final SyntheticDataService syntheticDataService;
+    private final PythonSyntheticDataService pythonSyntheticDataService;
     private final MaskingDataService maskingDataService;
     private final DatasetMetadataService datasetMetadataService;
     private final DatasetStorageService datasetStorageService;
 
     public DatasetController(
         SyntheticDataService syntheticDataService,
+        PythonSyntheticDataService pythonSyntheticDataService,
         MaskingDataService maskingDataService,
         DatasetMetadataService datasetMetadataService,
         DatasetStorageService datasetStorageService
     ) {
         this.syntheticDataService = syntheticDataService;
+        this.pythonSyntheticDataService = pythonSyntheticDataService;
         this.maskingDataService = maskingDataService;
         this.datasetMetadataService = datasetMetadataService;
         this.datasetStorageService = datasetStorageService;
@@ -47,6 +51,13 @@ public class DatasetController {
     @Operation(summary = "Generate synthetic dataset", description = "Creates a new synthetic dataset version from one table, selected tables, or a full schema with foreign-key aware generation.")
     public DatasetVersionResponse createSynthetic(@Valid @RequestBody CreateSyntheticDatasetRequest request) {
         DatasetVersion version = syntheticDataService.generate(request);
+        return ApiMapper.toResponse(version);
+    }
+
+    @PostMapping("/synthetic/python")
+    @Operation(summary = "Generate synthetic dataset with Python CTGAN", description = "Exports one source table to CSV, trains the external FastAPI/SDV CTGAN service, then stores the generated rows as a TDMS dataset version.")
+    public DatasetVersionResponse createPythonSynthetic(@Valid @RequestBody CreatePythonSyntheticDatasetRequest request) {
+        DatasetVersion version = pythonSyntheticDataService.generate(request);
         return ApiMapper.toResponse(version);
     }
 

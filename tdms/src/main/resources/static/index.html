@@ -172,8 +172,10 @@
                 <textarea rows="3" readonly>FIXED: one value | CHOICE: val1|val2|val3 | RANGE: min|max | TEMPLATE: ORD-${rowIndex} | EXPRESSION: ${quantity} * ${unit_price} | AGGREGATE: SUM(order_items.line_total BY order_id)</textarea>
             </label>
             <label>Description<textarea name="description" rows="2" placeholder="Synthetic customer dataset"></textarea></label>
+            <p class="dataset-meta">Extra feature: Python CTGAN uses the selected single source table and calls the FastAPI service running at `tdms.synthetic-python.base-url`.</p>
             <div class="inline-actions">
                 <button id="createProjectBtn" type="button">Create Project</button>
+                <button id="createPythonProjectBtn" type="button" class="secondary">Create Python CTGAN Project</button>
                 <button id="reloadProjectsBtn" type="button" class="secondary">Reload Projects</button>
             </div>
         </form>

@@ -757,6 +757,13 @@ function bindEvents() {
         });
     }
 
+    const createPythonProjectBtn = document.getElementById("createPythonProjectBtn");
+    if (createPythonProjectBtn) {
+        createPythonProjectBtn.addEventListener("click", () => {
+            submitPythonSynthetic().catch(handleError);
+        });
+    }
+
     if (hasElement(els.maskedForm)) {
         els.maskedForm.addEventListener("submit", (event) => {
             submitMasked(event).catch(handleError);
@@ -812,6 +819,41 @@ async function submitSyntheticCompatibilityPayload(payload) {
         body: JSON.stringify(payload)
     });
     log("Synthetic dataset version created", result);
+    await loadDatasets();
+    return result;
+}
+
+async function submitPythonSynthetic() {
+    if (!hasElement(els.syntheticForm)) {
+        throw new Error("Synthetic form is not available on this page.");
+    }
+    if (!els.syntheticForm.reportValidity()) {
+        throw new Error("Please fill in the required synthetic project fields first.");
+    }
+
+    const payload = parseForm(els.syntheticForm);
+    payload.rowCount = Number(payload.rowCount);
+
+    if (!payload.schemaName || !payload.tableName) {
+        throw new Error("Python CTGAN generation requires a schema and one primary table.");
+    }
+    if (els.syntheticForm.elements.generateWholeSchema?.checked) {
+        throw new Error("Python CTGAN generation currently supports a single table only. Disable 'Generate Whole Schema'.");
+    }
+
+    const result = await api("/api/datasets/synthetic/python", {
+        method: "POST",
+        body: JSON.stringify({
+            datasetName: payload.datasetName,
+            description: payload.description,
+            schemaName: payload.schemaName,
+            tableName: payload.tableName,
+            rowCount: payload.rowCount,
+            schemaVersion: payload.schemaVersion,
+            createdBy: payload.createdBy
+        })
+    });
+    log("Python CTGAN dataset version created", result);
     await loadDatasets();
     return result;
 }

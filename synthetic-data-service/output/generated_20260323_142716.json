@@ -1,0 +1,815 @@
+{
+  "status": "ok",
+  "num_rows": 100,
+  "columns": [
+    "customer_id",
+    "region",
+    "signup_date",
+    "is_active",
+    "spend_total",
+    "plan_type"
+  ],
+  "data": [
+    {
+      "customer_id": 5818374,
+      "region": "North",
+      "signup_date": "2024-02-01T00:00:00",
+      "is_active": true,
+      "spend_total": 282.33,
+      "plan_type": "Basic"
+    },
+    {
+      "customer_id": 15824738,
+      "region": "South",
+      "signup_date": "2024-02-18T00:00:00",
+      "is_active": false,
+      "spend_total": 287.44,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 771840,
+      "region": "East",
+      "signup_date": "2024-01-29T00:00:00",
+      "is_active": true,
+      "spend_total": 214.69,
+      "plan_type": "Basic"
+    },
+    {
+      "customer_id": 1261596,
+      "region": "North",
+      "signup_date": "2024-01-27T00:00:00",
+      "is_active": true,
+      "spend_total": 240.49,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 13658628,
+      "region": "North",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": true,
+      "spend_total": 215.37,
+      "plan_type": "Basic"
+    },
+    {
+      "customer_id": 13641282,
+      "region": "South",
+      "signup_date": "2024-02-14T00:00:00",
+      "is_active": false,
+      "spend_total": 179.54,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 14438421,
+      "region": "South",
+      "signup_date": "2024-01-30T00:00:00",
+      "is_active": true,
+      "spend_total": 258.66,
+      "plan_type": "Premium"
+    },
+    {
+      "customer_id": 10347800,
+      "region": "West",
+      "signup_date": "2024-01-17T00:00:00",
+      "is_active": true,
+      "spend_total": 128.85,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 2254028,
+      "region": "West",
+      "signup_date": "2024-01-17T00:00:00",
+      "is_active": true,
+      "spend_total": 310.1,
+      "plan_type": "Basic"
+    },
+    {
+      "customer_id": 8721075,
+      "region": "South",
+      "signup_date": "2024-01-19T00:00:00",
+      "is_active": false,
+      "spend_total": 233.55,
+      "plan_type": "Premium"
+    },
+    {
+      "customer_id": 10772059,
+      "region": "West",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": true,
+      "spend_total": 98.88,
+      "plan_type": "Basic"
+    },
+    {
+      "customer_id": 7285070,
+      "region": "South",
+      "signup_date": "2024-02-07T00:00:00",
+      "is_active": true,
+      "spend_total": 310.1,
+      "plan_type": "Premium"
+    },
+    {
+      "customer_id": 5463936,
+      "region": "North",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": true,
+      "spend_total": 243.98,
+      "plan_type": "Premium"
+    },
+    {
+      "customer_id": 7000828,
+      "region": "South",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": true,
+      "spend_total": 310.1,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 15962873,
+      "region": "West",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": false,
+      "spend_total": 49.5,
+      "plan_type": "Premium"
+    },
+    {
+      "customer_id": 2941398,
+      "region": "South",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": true,
+      "spend_total": 283.69,
+      "plan_type": "Premium"
+    },
+    {
+      "customer_id": 16048892,
+      "region": "East",
+      "signup_date": "2024-01-14T00:00:00",
+      "is_active": true,
+      "spend_total": 279.34,
+      "plan_type": "Basic"
+    },
+    {
+      "customer_id": 374575,
+      "region": "South",
+      "signup_date": "2024-02-18T00:00:00",
+      "is_active": true,
+      "spend_total": 97.81,
+      "plan_type": "Premium"
+    },
+    {
+      "customer_id": 16681709,
+      "region": "South",
+      "signup_date": "2024-01-22T00:00:00",
+      "is_active": false,
+      "spend_total": 295.32,
+      "plan_type": "Basic"
+    },
+    {
+      "customer_id": 8793760,
+      "region": "West",
+      "signup_date": "2024-01-25T00:00:00",
+      "is_active": true,
+      "spend_total": 45.25,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 12666102,
+      "region": "South",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": false,
+      "spend_total": 95.07,
+      "plan_type": "Premium"
+    },
+    {
+      "customer_id": 11523946,
+      "region": "South",
+      "signup_date": "2024-01-31T00:00:00",
+      "is_active": true,
+      "spend_total": 220.92,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 7978219,
+      "region": "South",
+      "signup_date": "2024-01-25T00:00:00",
+      "is_active": false,
+      "spend_total": 310.1,
+      "plan_type": "Premium"
+    },
+    {
+      "customer_id": 6544549,
+      "region": "South",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": true,
+      "spend_total": 291.55,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 11073415,
+      "region": "West",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": true,
+      "spend_total": 167.44,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 13671592,
+      "region": "South",
+      "signup_date": "2024-01-17T00:00:00",
+      "is_active": true,
+      "spend_total": 45.25,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 3980597,
+      "region": "West",
+      "signup_date": "2024-02-07T00:00:00",
+      "is_active": false,
+      "spend_total": 191.47,
+      "plan_type": "Premium"
+    },
+    {
+      "customer_id": 10364264,
+      "region": "East",
+      "signup_date": "2024-02-07T00:00:00",
+      "is_active": false,
+      "spend_total": 122.7,
+      "plan_type": "Basic"
+    },
+    {
+      "customer_id": 10719603,
+      "region": "West",
+      "signup_date": "2024-01-23T00:00:00",
+      "is_active": true,
+      "spend_total": 195.93,
+      "plan_type": "Premium"
+    },
+    {
+      "customer_id": 9140190,
+      "region": "North",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": true,
+      "spend_total": 202.6,
+      "plan_type": "Basic"
+    },
+    {
+      "customer_id": 11574913,
+      "region": "South",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": true,
+      "spend_total": 115.39,
+      "plan_type": "Basic"
+    },
+    {
+      "customer_id": 10783833,
+      "region": "South",
+      "signup_date": "2024-02-17T00:00:00",
+      "is_active": true,
+      "spend_total": 280.07,
+      "plan_type": "Premium"
+    },
+    {
+      "customer_id": 3837173,
+      "region": "East",
+      "signup_date": "2024-01-22T00:00:00",
+      "is_active": true,
+      "spend_total": 93.76,
+      "plan_type": "Premium"
+    },
+    {
+      "customer_id": 8329339,
+      "region": "West",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": true,
+      "spend_total": 290.63,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 2335510,
+      "region": "East",
+      "signup_date": "2024-01-17T00:00:00",
+      "is_active": true,
+      "spend_total": 195.85,
+      "plan_type": "Basic"
+    },
+    {
+      "customer_id": 5451784,
+      "region": "West",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": true,
+      "spend_total": 201.5,
+      "plan_type": "Premium"
+    },
+    {
+      "customer_id": 2135343,
+      "region": "West",
+      "signup_date": "2024-02-18T00:00:00",
+      "is_active": false,
+      "spend_total": 310.1,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 2422943,
+      "region": "West",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": true,
+      "spend_total": 215.41,
+      "plan_type": "Basic"
+    },
+    {
+      "customer_id": 3091951,
+      "region": "South",
+      "signup_date": "2024-01-22T00:00:00",
+      "is_active": true,
+      "spend_total": 187.48,
+      "plan_type": "Basic"
+    },
+    {
+      "customer_id": 12992542,
+      "region": "South",
+      "signup_date": "2024-02-08T00:00:00",
+      "is_active": true,
+      "spend_total": 240.82,
+      "plan_type": "Basic"
+    },
+    {
+      "customer_id": 3072898,
+      "region": "West",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": false,
+      "spend_total": 310.1,
+      "plan_type": "Premium"
+    },
+    {
+      "customer_id": 3596715,
+      "region": "West",
+      "signup_date": "2024-02-17T00:00:00",
+      "is_active": false,
+      "spend_total": 288.51,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 10253699,
+      "region": "West",
+      "signup_date": "2024-02-18T00:00:00",
+      "is_active": true,
+      "spend_total": 234.7,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 11427744,
+      "region": "North",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": true,
+      "spend_total": 197.54,
+      "plan_type": "Basic"
+    },
+    {
+      "customer_id": 16219071,
+      "region": "South",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": true,
+      "spend_total": 307.58,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 3131644,
+      "region": "South",
+      "signup_date": "2024-01-28T00:00:00",
+      "is_active": false,
+      "spend_total": 75.98,
+      "plan_type": "Premium"
+    },
+    {
+      "customer_id": 15802056,
+      "region": "West",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": false,
+      "spend_total": 246.89,
+      "plan_type": "Premium"
+    },
+    {
+      "customer_id": 3698559,
+      "region": "East",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": true,
+      "spend_total": 86.1,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 12198922,
+      "region": "East",
+      "signup_date": "2024-01-20T00:00:00",
+      "is_active": true,
+      "spend_total": 86.09,
+      "plan_type": "Basic"
+    },
+    {
+      "customer_id": 6299292,
+      "region": "East",
+      "signup_date": "2024-02-02T00:00:00",
+      "is_active": false,
+      "spend_total": 246.99,
+      "plan_type": "Basic"
+    },
+    {
+      "customer_id": 6865408,
+      "region": "East",
+      "signup_date": "2024-01-22T00:00:00",
+      "is_active": true,
+      "spend_total": 205.54,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 720225,
+      "region": "East",
+      "signup_date": "2024-02-13T00:00:00",
+      "is_active": false,
+      "spend_total": 169.06,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 16770207,
+      "region": "West",
+      "signup_date": "2024-02-03T00:00:00",
+      "is_active": true,
+      "spend_total": 223.49,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 5181033,
+      "region": "South",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": true,
+      "spend_total": 167.8,
+      "plan_type": "Premium"
+    },
+    {
+      "customer_id": 7867703,
+      "region": "South",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": true,
+      "spend_total": 283.27,
+      "plan_type": "Basic"
+    },
+    {
+      "customer_id": 8412355,
+      "region": "East",
+      "signup_date": "2024-01-17T00:00:00",
+      "is_active": false,
+      "spend_total": 159.65,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 5503506,
+      "region": "North",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": true,
+      "spend_total": 95.93,
+      "plan_type": "Basic"
+    },
+    {
+      "customer_id": 10169759,
+      "region": "East",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": true,
+      "spend_total": 124.04,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 741552,
+      "region": "West",
+      "signup_date": "2024-02-01T00:00:00",
+      "is_active": true,
+      "spend_total": 113.56,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 93438,
+      "region": "South",
+      "signup_date": "2024-02-05T00:00:00",
+      "is_active": true,
+      "spend_total": 212.73,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 3957641,
+      "region": "North",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": false,
+      "spend_total": 272.94,
+      "plan_type": "Basic"
+    },
+    {
+      "customer_id": 13457676,
+      "region": "North",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": true,
+      "spend_total": 310.1,
+      "plan_type": "Premium"
+    },
+    {
+      "customer_id": 15509300,
+      "region": "West",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": true,
+      "spend_total": 308.94,
+      "plan_type": "Basic"
+    },
+    {
+      "customer_id": 11575456,
+      "region": "East",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": true,
+      "spend_total": 260.75,
+      "plan_type": "Premium"
+    },
+    {
+      "customer_id": 13305284,
+      "region": "West",
+      "signup_date": "2024-02-08T00:00:00",
+      "is_active": false,
+      "spend_total": 310.1,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 5635342,
+      "region": "North",
+      "signup_date": "2024-01-30T00:00:00",
+      "is_active": false,
+      "spend_total": 276.91,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 4963997,
+      "region": "North",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": true,
+      "spend_total": 164.49,
+      "plan_type": "Basic"
+    },
+    {
+      "customer_id": 7234288,
+      "region": "North",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": false,
+      "spend_total": 173.26,
+      "plan_type": "Premium"
+    },
+    {
+      "customer_id": 7247379,
+      "region": "West",
+      "signup_date": "2024-01-19T00:00:00",
+      "is_active": false,
+      "spend_total": 310.1,
+      "plan_type": "Basic"
+    },
+    {
+      "customer_id": 12060174,
+      "region": "West",
+      "signup_date": "2024-02-14T00:00:00",
+      "is_active": false,
+      "spend_total": 310.1,
+      "plan_type": "Basic"
+    },
+    {
+      "customer_id": 2444093,
+      "region": "West",
+      "signup_date": "2024-01-30T00:00:00",
+      "is_active": false,
+      "spend_total": 198.61,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 11906293,
+      "region": "West",
+      "signup_date": "2024-01-30T00:00:00",
+      "is_active": false,
+      "spend_total": 310.1,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 9617349,
+      "region": "East",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": false,
+      "spend_total": 120.85,
+      "plan_type": "Premium"
+    },
+    {
+      "customer_id": 5915286,
+      "region": "East",
+      "signup_date": "2024-02-06T00:00:00",
+      "is_active": false,
+      "spend_total": 198.5,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 3041850,
+      "region": "West",
+      "signup_date": "2024-01-16T00:00:00",
+      "is_active": true,
+      "spend_total": 306.87,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 1475014,
+      "region": "South",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": false,
+      "spend_total": 142.97,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 12924672,
+      "region": "West",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": true,
+      "spend_total": 126.16,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 12316281,
+      "region": "South",
+      "signup_date": "2024-02-18T00:00:00",
+      "is_active": true,
+      "spend_total": 270.53,
+      "plan_type": "Basic"
+    },
+    {
+      "customer_id": 12713972,
+      "region": "East",
+      "signup_date": "2024-01-11T00:00:00",
+      "is_active": true,
+      "spend_total": 188.92,
+      "plan_type": "Premium"
+    },
+    {
+      "customer_id": 14763855,
+      "region": "East",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": false,
+      "spend_total": 310.1,
+      "plan_type": "Premium"
+    },
+    {
+      "customer_id": 10934880,
+      "region": "West",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": false,
+      "spend_total": 310.1,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 11529760,
+      "region": "North",
+      "signup_date": "2024-01-21T00:00:00",
+      "is_active": true,
+      "spend_total": 304.19,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 12559738,
+      "region": "North",
+      "signup_date": "2024-01-15T00:00:00",
+      "is_active": true,
+      "spend_total": 174.46,
+      "plan_type": "Basic"
+    },
+    {
+      "customer_id": 16086970,
+      "region": "North",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": true,
+      "spend_total": 310.1,
+      "plan_type": "Premium"
+    },
+    {
+      "customer_id": 13065551,
+      "region": "West",
+      "signup_date": "2024-01-20T00:00:00",
+      "is_active": false,
+      "spend_total": 232.24,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 13479842,
+      "region": "West",
+      "signup_date": "2024-01-12T00:00:00",
+      "is_active": true,
+      "spend_total": 310.1,
+      "plan_type": "Basic"
+    },
+    {
+      "customer_id": 16682349,
+      "region": "West",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": true,
+      "spend_total": 149.27,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 6354795,
+      "region": "South",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": true,
+      "spend_total": 171.8,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 14894246,
+      "region": "North",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": true,
+      "spend_total": 62.04,
+      "plan_type": "Basic"
+    },
+    {
+      "customer_id": 12791049,
+      "region": "West",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": false,
+      "spend_total": 45.25,
+      "plan_type": "Premium"
+    },
+    {
+      "customer_id": 3899,
+      "region": "East",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": true,
+      "spend_total": 197.67,
+      "plan_type": "Basic"
+    },
+    {
+      "customer_id": 16302012,
+      "region": "North",
+      "signup_date": "2024-02-17T00:00:00",
+      "is_active": false,
+      "spend_total": 272.7,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 8164099,
+      "region": "South",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": true,
+      "spend_total": 310.1,
+      "plan_type": "Premium"
+    },
+    {
+      "customer_id": 14033777,
+      "region": "West",
+      "signup_date": "2024-01-10T00:00:00",
+      "is_active": false,
+      "spend_total": 121.63,
+      "plan_type": "Premium"
+    },
+    {
+      "customer_id": 7588260,
+      "region": "North",
+      "signup_date": "2024-01-18T00:00:00",
+      "is_active": false,
+      "spend_total": 235.38,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 2577989,
+      "region": "West",
+      "signup_date": "2024-01-27T00:00:00",
+      "is_active": true,
+      "spend_total": 310.1,
+      "plan_type": "Basic"
+    },
+    {
+      "customer_id": 14194217,
+      "region": "South",
+      "signup_date": "2024-02-04T00:00:00",
+      "is_active": true,
+      "spend_total": 85.99,
+      "plan_type": "Premium"
+    },
+    {
+      "customer_id": 11034456,
+      "region": "East",
+      "signup_date": "2024-01-25T00:00:00",
+      "is_active": true,
+      "spend_total": 59.28,
+      "plan_type": "Basic"
+    },
+    {
+      "customer_id": 11845047,
+      "region": "East",
+      "signup_date": "2024-01-23T00:00:00",
+      "is_active": false,
+      "spend_total": 310.1,
+      "plan_type": "Standard"
+    },
+    {
+      "customer_id": 14077250,
+      "region": "North",
+      "signup_date": "2024-01-24T00:00:00",
+      "is_active": true,
+      "spend_total": 98.78,
+      "plan_type": "Premium"
+    }
+  ],
+  "filename": "generated_20260323_142716.json"
+}
