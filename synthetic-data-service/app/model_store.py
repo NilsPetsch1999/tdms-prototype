@@ -8,14 +8,10 @@ from typing import Any
 
 
 def model_exists(path: str) -> bool:
-    """Return whether a serialized model file exists."""
-
     return Path(path).is_file()
 
 
 def save_synthesizer(synthesizer: Any, path: str) -> None:
-    """Persist a synthesizer using SDV helpers when available."""
-
     destination = Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)
 
@@ -29,18 +25,30 @@ def save_synthesizer(synthesizer: Any, path: str) -> None:
 
 
 def load_synthesizer(path: str) -> Any:
-    """Load a synthesizer using SDV helpers when available."""
-
     source = Path(path)
 
-    try:
-        from sdv.single_table import CTGANSynthesizer
-
-        load_method = getattr(CTGANSynthesizer, "load", None)
-        if callable(load_method):
-            return load_method(filepath=str(source))
-    except ImportError:
-        pass
+    for loader in (_try_load_hma, _try_load_ctgan):
+        synthesizer = loader(source)
+        if synthesizer is not None:
+            return synthesizer
 
     with source.open("rb") as file_obj:
         return pickle.load(file_obj)
+
+
+def _try_load_hma(path: Path) -> Any | None:
+    try:
+        from sdv.multi_table import HMASynthesizer
+
+        return HMASynthesizer.load(filepath=str(path))
+    except Exception:
+        return None
+
+
+def _try_load_ctgan(path: Path) -> Any | None:
+    try:
+        from sdv.single_table import CTGANSynthesizer
+
+        return CTGANSynthesizer.load(filepath=str(path))
+    except Exception:
+        return None

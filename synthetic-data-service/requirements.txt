@@ -6,3 +6,6 @@ pydantic
 python-dotenv
 pytest
 httpx
+sqlalchemy
+pymysql
+cryptography

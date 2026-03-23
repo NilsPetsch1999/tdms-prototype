@@ -7,10 +7,29 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 import fhcampus.nilspetsch.tdms.service.SourceDatabaseConnectionService;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.util.List;
+
 @Component
 public class DemoSchemaInitializer implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DemoSchemaInitializer.class);
+    private static final List<String> FIRST_NAMES = List.of(
+        "Nina", "Lukas", "Elena", "Sophie", "Jonas", "Mia", "David", "Lea", "Paul", "Anna"
+    );
+    private static final List<String> LAST_NAMES = List.of(
+        "Huber", "Mayer", "Wagner", "Gruber", "Pichler", "Steiner", "Bauer", "Hofer", "Eder", "Fuchs"
+    );
+    private static final List<String> CITIES = List.of(
+        "Vienna", "Linz", "Graz", "Salzburg", "Innsbruck", "Klagenfurt"
+    );
+    private static final List<String> SEGMENTS = List.of("RETAIL", "BUSINESS", "ENTERPRISE");
+    private static final List<String> CATEGORIES = List.of("Electronics", "Office", "Accessories", "Software");
+    private static final List<String> BRANDS = List.of("Nimbus", "Vista", "Orbit", "NorthSeat", "CoreLine");
+    private static final List<String> ORDER_STATUSES = List.of("NEW", "PROCESSING", "PAID", "SHIPPED", "COMPLETED");
+    private static final List<String> PAYMENT_METHODS = List.of("CREDIT_CARD", "PAYPAL", "INVOICE", "BANK_TRANSFER");
 
     private final SourceDatabaseConnectionService sourceDatabaseConnectionService;
 
@@ -131,7 +150,7 @@ public class DemoSchemaInitializer implements ApplicationRunner {
     private void seedCustomers(org.springframework.jdbc.core.JdbcTemplate jdbcTemplate) {
         Integer customerCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM demo.customers", Integer.class);
         if (customerCount != null && customerCount == 0) {
-            jdbcTemplate.update(
+            String sql =
                 """
                 INSERT INTO demo.customers (
                     customer_number,
@@ -145,20 +164,35 @@ public class DemoSchemaInitializer implements ApplicationRunner {
                     postal_code,
                     country_code,
                     segment
-                )
-                VALUES
-                    ('CUST-1001', 'Nina', 'Huber', 'nina.huber@example.org', '+43 660 1234567', '1995-04-11', 'Mariahilfer Strasse 12', 'Vienna', '1060', 'AT', 'RETAIL'),
-                    ('CUST-1002', 'Lukas', 'Mayer', 'lukas.mayer@example.org', '+43 699 2345678', '1982-09-23', 'Landstrasse 44', 'Linz', '4020', 'AT', 'BUSINESS'),
-                    ('CUST-1003', 'Elena', 'Wagner', 'elena.wagner@example.org', '+43 676 3456789', '1989-01-15', 'Annenstrasse 8', 'Graz', '8020', 'AT', 'RETAIL')
-                """
-            );
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """;
+            for (int i = 1; i <= 55; i++) {
+                String firstName = FIRST_NAMES.get((i - 1) % FIRST_NAMES.size());
+                String lastName = LAST_NAMES.get(((i - 1) / FIRST_NAMES.size()) % LAST_NAMES.size());
+                String city = CITIES.get((i - 1) % CITIES.size());
+                String email = (firstName + "." + lastName + "." + i + "@example.org").toLowerCase();
+                jdbcTemplate.update(
+                    sql,
+                    "CUST-" + String.format("%04d", 1000 + i),
+                    firstName,
+                    lastName,
+                    email,
+                    "+43 660 " + String.format("%07d", 1000000 + (i * 37)),
+                    LocalDate.of(1980 + (i % 20), ((i - 1) % 12) + 1, ((i - 1) % 27) + 1),
+                    "Sample Street " + i,
+                    city,
+                    String.valueOf(1000 + ((i * 73) % 8000)),
+                    "AT",
+                    SEGMENTS.get((i - 1) % SEGMENTS.size())
+                );
+            }
         }
     }
 
     private void seedProducts(org.springframework.jdbc.core.JdbcTemplate jdbcTemplate) {
         Integer productCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM demo.products", Integer.class);
         if (productCount != null && productCount == 0) {
-            jdbcTemplate.update(
+            String sql =
                 """
                 INSERT INTO demo.products (
                     sku,
@@ -170,21 +204,32 @@ public class DemoSchemaInitializer implements ApplicationRunner {
                     currency_code,
                     stock_quantity,
                     active
-                )
-                VALUES
-                    ('LAP-14-PRO', 'Nimbus Pro 14 Laptop', 'Electronics', 'Nimbus', '14-inch business laptop with 16GB RAM and 512GB SSD', 1299.00, 'EUR', 25, TRUE),
-                    ('MON-27-4K', 'Vista 27 4K Monitor', 'Electronics', 'Vista', '27-inch UHD monitor with USB-C docking', 349.90, 'EUR', 40, TRUE),
-                    ('DOC-USB-C', 'Docking Station USB-C', 'Accessories', 'Orbit', 'USB-C docking station with HDMI and Ethernet', 149.50, 'EUR', 60, TRUE),
-                    ('CHR-ERG-01', 'Ergo Comfort Chair', 'Office', 'NorthSeat', 'Ergonomic office chair with lumbar support', 289.00, 'EUR', 18, TRUE)
-                """
-            );
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """;
+            for (int i = 1; i <= 50; i++) {
+                String category = CATEGORIES.get((i - 1) % CATEGORIES.size());
+                String brand = BRANDS.get((i - 1) % BRANDS.size());
+                BigDecimal price = BigDecimal.valueOf(19.99 + (i * 17.35)).setScale(2, RoundingMode.HALF_UP);
+                jdbcTemplate.update(
+                    sql,
+                    "SKU-" + String.format("%05d", i),
+                    brand + " " + category + " Item " + i,
+                    category,
+                    brand,
+                    "Demo product " + i + " for synthetic data experiments",
+                    price,
+                    "EUR",
+                    10 + (i * 3),
+                    i % 11 != 0
+                );
+            }
         }
     }
 
     private void seedOrders(org.springframework.jdbc.core.JdbcTemplate jdbcTemplate) {
         Integer orderCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM demo.orders", Integer.class);
         if (orderCount != null && orderCount == 0) {
-            jdbcTemplate.update(
+            String sql =
                 """
                 INSERT INTO demo.orders (
                     customer_id,
@@ -196,41 +241,84 @@ public class DemoSchemaInitializer implements ApplicationRunner {
                     status,
                     payment_method,
                     order_date
-                )
-                SELECT c.id, seed.order_number, 'EUR', seed.subtotal_amount, seed.shipping_amount, seed.total_amount, seed.status, seed.payment_method, seed.order_date
-                FROM (
-                    SELECT 'nina.huber@example.org' AS customer_email, 'PO-10001' AS order_number, 1648.90 AS subtotal_amount, 0.00 AS shipping_amount, 1648.90 AS total_amount, 'PAID' AS status, 'CREDIT_CARD' AS payment_method, DATE('2025-10-10') AS order_date
-                    UNION ALL
-                    SELECT 'lukas.mayer@example.org', 'PO-10002', 289.00, 14.90, 303.90, 'PROCESSING', 'INVOICE', DATE('2025-10-11')
-                    UNION ALL
-                    SELECT 'elena.wagner@example.org', 'PO-10003', 149.50, 0.00, 149.50, 'SHIPPED', 'PAYPAL', DATE('2025-10-12')
-                ) seed
-                JOIN demo.customers c ON c.email = seed.customer_email
-                """
-            );
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """;
+            for (int i = 1; i <= 66; i++) {
+                BigDecimal shipping = i % 3 == 0 ? BigDecimal.ZERO : BigDecimal.valueOf(4.90 + (i % 4) * 2.5).setScale(2, RoundingMode.HALF_UP);
+                jdbcTemplate.update(
+                    sql,
+                    ((i - 1) % 55) + 1L,
+                    "PO-" + String.format("%05d", 10000 + i),
+                    "EUR",
+                    BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
+                    shipping,
+                    shipping,
+                    ORDER_STATUSES.get((i - 1) % ORDER_STATUSES.size()),
+                    PAYMENT_METHODS.get((i - 1) % PAYMENT_METHODS.size()),
+                    LocalDate.of(2025, ((i - 1) % 12) + 1, ((i - 1) % 27) + 1)
+                );
+            }
         }
     }
 
     private void seedOrderItems(org.springframework.jdbc.core.JdbcTemplate jdbcTemplate) {
         Integer orderItemCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM demo.order_items", Integer.class);
         if (orderItemCount != null && orderItemCount == 0) {
-            jdbcTemplate.update(
+            String sql =
                 """
                 INSERT INTO demo.order_items (order_id, product_id, quantity, unit_price, line_total)
-                SELECT po.id, p.id, seed.quantity, seed.unit_price, seed.line_total
-                FROM (
-                    SELECT 'PO-10001' AS order_number, 'LAP-14-PRO' AS sku, 1 AS quantity, 1299.00 AS unit_price, 1299.00 AS line_total
-                    UNION ALL
-                    SELECT 'PO-10001', 'MON-27-4K', 1, 349.90, 349.90
-                    UNION ALL
-                    SELECT 'PO-10002', 'CHR-ERG-01', 1, 289.00, 289.00
-                    UNION ALL
-                    SELECT 'PO-10003', 'DOC-USB-C', 1, 149.50, 149.50
-                ) seed
-                JOIN demo.orders po ON po.order_number = seed.order_number
-                JOIN demo.products p ON p.sku = seed.sku
+                VALUES (?, ?, ?, ?, ?)
+                """;
+            int orderItemIndex = 0;
+            for (int orderId = 1; orderId <= 66; orderId++) {
+                int itemCountForOrder = orderId <= 27 ? 2 : 1;
+                for (int itemIndex = 0; itemIndex < itemCountForOrder; itemIndex++) {
+                    orderItemIndex++;
+                    long productId = (((orderId - 1) * 2L + itemIndex) % 50) + 1L;
+                    int quantity = ((orderId + itemIndex) % 4) + 1;
+                    BigDecimal unitPrice = BigDecimal.valueOf(19.99 + (productId * 17.35)).setScale(2, RoundingMode.HALF_UP);
+                    jdbcTemplate.update(
+                        sql,
+                        (long) orderId,
+                        productId,
+                        quantity,
+                        unitPrice,
+                        unitPrice.multiply(BigDecimal.valueOf(quantity)).setScale(2, RoundingMode.HALF_UP)
+                    );
+                }
+            }
+
+            if (orderItemIndex != 93) {
+                throw new IllegalStateException("Expected to seed 93 order items but seeded " + orderItemIndex);
+            }
+
+            jdbcTemplate.update(
+                """
+                UPDATE demo.orders o
+                LEFT JOIN (
+                    SELECT order_id,
+                           SUM(line_total) AS subtotal
+                    FROM demo.order_items
+                    GROUP BY order_id
+                ) totals ON totals.order_id = o.id
+                SET o.subtotal_amount = COALESCE(totals.subtotal, 0.00),
+                    o.total_amount = COALESCE(totals.subtotal, 0.00) + o.shipping_amount
+                """
+            );
+
+            jdbcTemplate.update(
+                """
+                UPDATE demo.orders
+                SET status = CASE
+                    WHEN id % 5 = 0 THEN 'COMPLETED'
+                    WHEN id % 5 = 1 THEN 'PAID'
+                    WHEN id % 5 = 2 THEN 'SHIPPED'
+                    WHEN id % 5 = 3 THEN 'PROCESSING'
+                    ELSE 'NEW'
+                END
                 """
             );
         }
     }
+
 }

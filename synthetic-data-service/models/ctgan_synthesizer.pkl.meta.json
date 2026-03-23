@@ -1,0 +1,95 @@
+{
+  "model_type": "multi_table",
+  "schema_name": "demo",
+  "base_table": "customers",
+  "trained_tables": [
+    "customers",
+    "order_items",
+    "orders",
+    "products"
+  ],
+  "trained_columns": {
+    "customers": [
+      "id",
+      "customer_number",
+      "first_name",
+      "last_name",
+      "email",
+      "phone",
+      "date_of_birth",
+      "street_address",
+      "city",
+      "postal_code",
+      "country_code",
+      "segment",
+      "created_at",
+      "updated_at"
+    ],
+    "order_items": [
+      "id",
+      "order_id",
+      "product_id",
+      "quantity",
+      "unit_price",
+      "line_total"
+    ],
+    "orders": [
+      "id",
+      "customer_id",
+      "order_number",
+      "currency_code",
+      "subtotal_amount",
+      "shipping_amount",
+      "total_amount",
+      "status",
+      "payment_method",
+      "order_date",
+      "created_at"
+    ],
+    "products": [
+      "id",
+      "sku",
+      "name",
+      "category",
+      "brand",
+      "description",
+      "unit_price",
+      "currency_code",
+      "stock_quantity",
+      "active",
+      "created_at"
+    ]
+  },
+  "row_counts": {
+    "customers": 55,
+    "order_items": 93,
+    "orders": 66,
+    "products": 50
+  },
+  "primary_keys": {
+    "customers": "id",
+    "order_items": "id",
+    "orders": "id",
+    "products": "id"
+  },
+  "relationships": [
+    {
+      "parent_table": "orders",
+      "child_table": "order_items",
+      "parent_key": "id",
+      "child_key": "order_id"
+    },
+    {
+      "parent_table": "products",
+      "child_table": "order_items",
+      "parent_key": "id",
+      "child_key": "product_id"
+    },
+    {
+      "parent_table": "customers",
+      "child_table": "orders",
+      "parent_key": "id",
+      "child_key": "customer_id"
+    }
+  ]
+}

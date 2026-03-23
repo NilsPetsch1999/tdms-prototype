@@ -1,16 +1,16 @@
-"""FastAPI entrypoint for the synthetic data microservice."""
+"""FastAPI entrypoint for database-backed synthetic data generation."""
 
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from datetime import datetime
 import json
-import os
 
-from fastapi import FastAPI, File, HTTPException, Query, UploadFile
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-import pandas as pd
+from sqlalchemy import create_engine, inspect
 
 from app.config import get_settings
 from app.schemas import (
@@ -24,42 +24,48 @@ from app.schemas import (
 from app.service import create_service
 
 
+load_dotenv()
+
 settings = get_settings()
 service = create_service()
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    """Load a persisted model at startup when available."""
-
     service.startup_load_model_if_available()
     yield
 
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.1.0",
+    version="0.2.0",
     lifespan=lifespan,
 )
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+static_dir = settings.resolve_path("static")
+if static_dir.is_dir():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
-@app.get("/")
+output_dir = settings.resolve_path("output")
+output_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/output", StaticFiles(directory=str(output_dir)), name="output")
+
+
+@app.get("/", include_in_schema=False)
 def read_root():
-    return FileResponse("static/index.html")
+    index_path = settings.resolve_path("static/index.html")
+    if not index_path.is_file():
+        raise HTTPException(status_code=404, detail="UI file not found.")
+    return FileResponse(str(index_path))
 
 
 @app.get("/health", response_model=dict[str, str], tags=["system"])
 def health_check() -> dict[str, str]:
-    """Simple health endpoint for liveness checks."""
-
     return {"status": "ok"}
 
 
 @app.get("/status", response_model=StatusResponse, tags=["system"])
 def get_status() -> StatusResponse:
-    """Return current model availability and training metadata."""
-
     return service.get_status()
 
 
@@ -70,10 +76,15 @@ def get_status() -> StatusResponse:
     tags=["training"],
 )
 def train_model(request: TrainRequest) -> TrainResponse:
-    """Train a CTGAN synthesizer from a local CSV file."""
+    """Train from one or more database tables."""
 
     try:
-        return service.train(data_path=request.data_path, save_model=request.save_model)
+        return service.train(
+            table_names=request.table_names,
+            schema_name=request.schema_name,
+            base_table=request.base_table,
+            save_model=request.save_model,
+        )
     except ValueError as exc:
         return JSONResponse(status_code=400, content={"detail": str(exc)})
     except RuntimeError as exc:
@@ -87,72 +98,46 @@ def train_model(request: TrainRequest) -> TrainResponse:
     tags=["generation"],
 )
 def generate_rows(request: GenerateRequest) -> GenerateResponse:
-    """Generate synthetic rows from the active trained model."""
+    """Generate synthetic data from the active model."""
 
-    result = service.generate(num_rows=request.num_rows)
-    # Save to JSON
-    os.makedirs("output", exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"generated_{timestamp}.json"
-    filepath = f"output/{filename}"
-    df = pd.DataFrame(result)
-    columns = list(df.columns)
-    response = GenerateResponse(
-        status="ok",
-        num_rows=request.num_rows,
-        columns=columns,
-        data=result,
-        filename=filename
-    )
-    with open(filepath, 'w') as f:
-        json.dump(response.dict(), f, indent=2)
+    response = service.generate(num_rows=request.num_rows)
+    filename = f"generated_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    with (output_dir / filename).open("w", encoding="utf-8") as file_obj:
+        json.dump(response.model_dump(), file_obj, indent=2)
+    response.filename = filename
     return response
 
 
-@app.get(
-    "/sample-preview",
-    response_model=list[dict],
-    responses={404: {"model": ErrorResponse}},
-    tags=["data"],
-)
-def sample_preview(rows: int = Query(5, ge=1, le=100)) -> list[dict]:
-    """Return a small preview of the configured real CSV dataset."""
-
-    return service.sample_preview(rows)
-
-
-@app.post("/upload")
-async def upload_csv(file: UploadFile = File(...)):
-    """Upload a CSV file for training."""
-
-    import os
-    os.makedirs("data", exist_ok=True)
-    file_path = f"data/{file.filename}"
-    with open(file_path, "wb") as f:
-        content = await file.read()
-        f.write(content)
-    return {"message": f"File {file.filename} uploaded successfully", "path": file_path}
-
-
-@app.post("/delete")
+@app.post("/delete", tags=["system"])
 def delete_model():
-    """Delete the current trained model."""
+    """Delete the current persisted model and reset in-memory status."""
 
-    import os
     service.synthesizer = None
-    service.trained_on_rows = None
-    service.trained_on_columns = None
-    model_path = str(settings.resolve_path(settings.model_path))
-    if os.path.exists(model_path):
-        os.remove(model_path)
+    service.model_type = None
+    service.schema_name = None
+    service.base_table = None
+    service.trained_tables = None
+    service.trained_columns = None
+    service.row_counts = None
+    service.relationships = None
+
+    model_path = settings.resolve_path(settings.model_path)
+    if model_path.exists():
+        model_path.unlink()
+    metadata_path = model_path.with_suffix(model_path.suffix + ".meta.json")
+    if metadata_path.exists():
+        metadata_path.unlink()
     return {"message": "Model deleted successfully"}
 
 
-@app.get("/download/{filename}")
-def download_json(filename: str):
-    """Download a generated JSON file."""
+@app.get("/tables", tags=["database"])
+def list_tables(schema_name: str | None = Query(None)) -> dict[str, list[str]]:
+    """List available database tables for optional schema selection."""
 
-    filepath = f"output/{filename}"
-    if not os.path.exists(filepath):
-        raise HTTPException(status_code=404, detail="File not found")
-    return FileResponse(filepath, media_type='application/json', filename=filename)
+    engine = create_engine(settings.database_url)
+    try:
+        inspector = inspect(engine)
+        tables = inspector.get_table_names(schema=schema_name)
+        return {"tables": tables}
+    finally:
+        engine.dispose()

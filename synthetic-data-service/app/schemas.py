@@ -1,8 +1,10 @@
-"""Request and response schemas."""
+"""Request and response schemas for database-backed synthetic generation."""
+
+from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.config import get_settings
 
@@ -11,18 +13,40 @@ settings = get_settings()
 
 
 class TrainRequest(BaseModel):
-    """Request body for training a synthesizer."""
+    """Request body for model training from database tables."""
 
-    data_path: str | None = None
+    table_names: list[str] = Field(..., min_length=1)
+    schema_name: str | None = None
+    base_table: str | None = None
     save_model: bool = True
+
+    @field_validator("table_names")
+    @classmethod
+    def validate_table_names(cls, value: list[str]) -> list[str]:
+        cleaned = [table.strip() for table in value if table and table.strip()]
+        unique = list(dict.fromkeys(cleaned))
+        if not unique:
+            raise ValueError("Provide at least one table name.")
+        return unique
+
+    @model_validator(mode="after")
+    def validate_base_table(self) -> "TrainRequest":
+        if self.base_table and self.base_table not in self.table_names:
+            raise ValueError("base_table must be one of the selected table_names.")
+        return self
 
 
 class TrainResponse(BaseModel):
     """Training result metadata."""
 
     status: str
-    rows: int
-    columns: list[str]
+    model_type: str
+    schema_name: str | None
+    base_table: str
+    tables: list[str]
+    columns: dict[str, list[str]]
+    row_counts: dict[str, int]
+    relationships: list[dict[str, str]]
     model_saved: bool
     message: str
 
@@ -36,8 +60,6 @@ class GenerateRequest(BaseModel):
     @field_validator("num_rows")
     @classmethod
     def validate_num_rows(cls, value: int) -> int:
-        """Ensure the requested row count stays within service limits."""
-
         if value > settings.max_generate_rows:
             raise ValueError(
                 f"num_rows must be less than or equal to {settings.max_generate_rows}"
@@ -49,15 +71,12 @@ class GenerateResponse(BaseModel):
     """Synthetic data payload."""
 
     status: str
+    model_type: str
+    base_table: str
     num_rows: int
-    columns: list[str]
-    data: list[dict[str, Any]]
-    filename: str
-
-    status: str
-    num_rows: int
-    columns: list[str]
-    data: list[dict[str, Any]]
+    tables: list[str]
+    data: dict[str, list[dict[str, Any]]]
+    filename: str | None = None
 
 
 class StatusResponse(BaseModel):
@@ -65,8 +84,13 @@ class StatusResponse(BaseModel):
 
     status: str
     model_loaded: bool
-    trained_on_rows: int | None
-    trained_on_columns: list[str] | None
+    model_type: str | None
+    schema_name: str | None
+    base_table: str | None
+    trained_tables: list[str] | None
+    trained_columns: dict[str, list[str]] | None
+    row_counts: dict[str, int] | None
+    relationships: list[dict[str, str]] | None
     model_path: str
 
 

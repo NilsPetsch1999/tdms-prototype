@@ -1,4 +1,4 @@
-"""Helpers for building single-table SDV metadata."""
+"""Helpers for building SDV metadata from database-loaded dataframes."""
 
 from __future__ import annotations
 
@@ -8,27 +8,12 @@ import pandas as pd
 from pandas.api.types import (
     is_bool_dtype,
     is_datetime64_any_dtype,
-    is_integer_dtype,
     is_float_dtype,
+    is_integer_dtype,
 )
 
 
-def _load_single_table_metadata_class() -> type[Any]:
-    """Import SDV metadata types lazily to remain version tolerant."""
-
-    try:
-        from sdv.metadata import SingleTableMetadata
-
-        return SingleTableMetadata
-    except ImportError as exc:
-        raise RuntimeError(
-            "SDV is required to build metadata. Install dependencies from requirements.txt."
-        ) from exc
-
-
 def _infer_sdtype(series: pd.Series) -> str:
-    """Map pandas dtypes to simple SDV sdtypes."""
-
     if is_bool_dtype(series):
         return "boolean"
     if is_datetime64_any_dtype(series):
@@ -38,39 +23,77 @@ def _infer_sdtype(series: pd.Series) -> str:
     return "categorical"
 
 
-def build_single_table_metadata(df: pd.DataFrame) -> Any:
-    """Create SDV metadata using auto-detection first, then a manual fallback.
+def build_single_table_metadata(df: pd.DataFrame, primary_key: str | None = None) -> Any:
+    """Create robust single-table SDV metadata."""
 
-    Metadata quality strongly affects the realism and consistency of synthetic
-    data, so the fallback keeps the mapping conservative and easy to inspect.
+    try:
+        from sdv.metadata import SingleTableMetadata
+    except ImportError as exc:
+        raise RuntimeError("SDV is required to build metadata.") from exc
+
+    metadata = SingleTableMetadata()
+
+    try:
+        metadata.detect_from_dataframe(data=df)
+    except Exception:
+        columns: dict[str, dict[str, str]] = {
+            column_name: {"sdtype": _infer_sdtype(df[column_name])}
+            for column_name in df.columns
+        }
+        metadata = SingleTableMetadata.load_from_dict({"columns": columns})
+
+    if primary_key and primary_key in df.columns:
+        try:
+            metadata.set_primary_key(primary_key)
+        except Exception:
+            pass
+
+    return metadata
+
+
+def build_multi_table_metadata(
+    tables: dict[str, pd.DataFrame],
+    primary_keys: dict[str, str | None],
+    relationships: list[dict[str, str]],
+) -> Any:
+    """Create multi-table metadata and wire in detected DB relationships.
+
+    We intentionally avoid SDV's cross-table relationship auto-detection here.
+    In schemas where many tables use a generic ``id`` primary key, SDV may infer
+    incorrect ``id -> id`` relationships. We only add relationships that come
+    from the inspected database foreign keys.
     """
 
-    metadata_cls = _load_single_table_metadata_class()
-    metadata = metadata_cls()
-
     try:
-        detect_from_dataframe = getattr(metadata, "detect_from_dataframe", None)
-        if callable(detect_from_dataframe):
-            detect_from_dataframe(data=df)
-            return metadata
-    except Exception:
-        pass
+        from sdv.metadata import MultiTableMetadata
+    except ImportError as exc:
+        raise RuntimeError("SDV multi-table support is required to build metadata.") from exc
 
-    columns: dict[str, dict[str, str]] = {}
-    for column_name in df.columns:
-        columns[column_name] = {"sdtype": _infer_sdtype(df[column_name])}
+    metadata = MultiTableMetadata()
+    for table_name, df in tables.items():
+        metadata.detect_table_from_dataframe(
+            table_name=table_name,
+            data=df,
+            infer_sdtypes=True,
+            infer_keys="primary_only",
+        )
 
-    metadata_dict = {"columns": columns}
+    for table_name, primary_key in primary_keys.items():
+        if primary_key and primary_key in tables[table_name].columns:
+            try:
+                metadata.set_primary_key(table_name, primary_key)
+            except Exception:
+                pass
 
-    try:
-        load_from_dict = getattr(metadata, "load_from_dict", None)
-        if callable(load_from_dict):
-            load_from_dict(metadata_dict)
-            return metadata
-    except Exception:
-        pass
+    for relationship in relationships:
+        try:
+            metadata.add_relationship(
+                parent_table_name=relationship["parent_table"],
+                child_table_name=relationship["child_table"],
+                parent_primary_key=relationship["parent_key"],
+                child_foreign_key=relationship["child_key"],
+            )
+        except Exception:
+            pass
 
-    try:
-        return metadata_cls.load_from_dict(metadata_dict)
-    except AttributeError as exc:
-        raise RuntimeError("Unable to create SDV metadata with the installed version.") from exc
+    return metadata

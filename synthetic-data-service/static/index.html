@@ -3,118 +3,276 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Synthetic Data Model Training</title>
+    <title>Synthetic Data Service</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        form { margin-bottom: 20px; padding: 10px; border: 1px solid #ccc; }
-        input, button { margin: 5px; }
-        #status { margin-top: 20px; }
+        :root {
+            --bg: #f4f1ea;
+            --panel: #fffaf2;
+            --ink: #1f2933;
+            --accent: #14532d;
+            --line: #d6d3d1;
+        }
+        body {
+            margin: 0;
+            font-family: Georgia, "Times New Roman", serif;
+            background: radial-gradient(circle at top left, #fff7ed, var(--bg) 45%);
+            color: var(--ink);
+        }
+        main {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 18px;
+            box-shadow: 0 10px 30px rgba(20, 83, 45, 0.08);
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+        }
+        input, button, select {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 10px 12px;
+            margin-top: 6px;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+        }
+        button {
+            background: var(--accent);
+            color: white;
+            cursor: pointer;
+        }
+        button.secondary {
+            background: #3f3f46;
+        }
+        .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .actions button {
+            width: auto;
+        }
+        .table-list {
+            columns: 2;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-break: break-word;
+            background: #111827;
+            color: #e5e7eb;
+            padding: 14px;
+            border-radius: 12px;
+            overflow: auto;
+        }
+        @media (max-width: 700px) {
+            .table-list {
+                columns: 1;
+            }
+        }
     </style>
 </head>
 <body>
-    <h1>Synthetic Data Model Training</h1>
+<main>
+    <section class="panel">
+        <h1>Synthetic Data Service</h1>
+        <p>
+            Train on one table or several related tables from the database. Multi-table training keeps
+            foreign-key relationships so generated data comes back as a relational bundle.
+        </p>
+    </section>
 
-    <h2>Upload CSV Data</h2>
-    <form id="uploadForm" enctype="multipart/form-data">
-        <input type="file" name="file" accept=".csv" required>
-        <button type="submit">Upload CSV</button>
-    </form>
+    <section class="panel">
+        <h2>Database Tables</h2>
+        <div class="grid">
+            <label>
+                Schema Name
+                <input id="schemaName" placeholder="Optional schema">
+            </label>
+        </div>
+        <div class="actions">
+            <button id="listTablesBtn" type="button">Load Tables</button>
+        </div>
+        <div id="tableSelection" class="table-list"></div>
+    </section>
 
-    <h2>Train Model</h2>
-    <form id="trainForm">
-        <label>Data Path (leave empty for default or uploaded):</label>
-        <input type="text" name="data_path" placeholder="e.g., data/uploaded.csv">
-        <label>Desired Output Rows (for generation, not training):</label>
-        <input type="number" name="num_rows" value="100" min="1">
-        <button type="submit">Train Model</button>
-    </form>
+    <section class="panel">
+        <h2>Train Model</h2>
+        <div class="grid">
+            <label>
+                Base Table
+                <select id="baseTableSelect">
+                    <option value="">Auto-select first table</option>
+                </select>
+            </label>
+            <label>
+                Save Model
+                <select id="saveModel">
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                </select>
+            </label>
+        </div>
+        <div class="actions">
+            <button id="trainBtn" type="button">Train Selected Tables</button>
+            <button id="deleteBtn" type="button" class="secondary">Delete Model</button>
+        </div>
+        <pre id="trainStatus">No model trained yet.</pre>
+    </section>
 
-    <h2>Generate Synthetic Data</h2>
-    <form id="generateForm">
-        <label>Number of Rows:</label>
-        <input type="number" name="num_rows" value="100" min="1" required>
-        <label>Randomize Seed:</label>
-        <input type="checkbox" name="randomize_seed">
-        <button type="submit">Generate</button>
-    </form>
-    <div id="downloadLink" style="margin-top: 10px;"></div>
-    <pre id="generatedData"></pre>
+    <section class="panel">
+        <h2>Generate Synthetic Data</h2>
+        <div class="grid">
+            <label>
+                Desired Rows For Base Table
+                <input id="numRows" type="number" min="1" value="100">
+            </label>
+        </div>
+        <div class="actions">
+            <button id="generateBtn" type="button">Generate</button>
+            <button id="statusBtn" type="button" class="secondary">Refresh Status</button>
+        </div>
+        <div id="downloadLink"></div>
+        <pre id="statusBox"></pre>
+        <pre id="generatedData"></pre>
+    </section>
+</main>
 
-    <h2>Delete Current Model</h2>
-    <form id="deleteForm">
-        <button type="submit">Delete Model</button>
-    </form>
-
-    <div id="status"></div>
-
-    <script>
-        const api = async (path, options = {}) => {
-            const response = await fetch(path, options);
-            if (!response.ok) throw new Error(await response.text());
-            return response.json();
-        };
-
-        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            try {
-                const result = await fetch('/upload', { method: 'POST', body: formData });
-                const data = await result.json();
-                document.getElementById('status').textContent = JSON.stringify(data, null, 2);
-            } catch (error) {
-                document.getElementById('status').textContent = 'Error: ' + error.message;
-            }
+<script>
+    const api = async (path, options = {}) => {
+        const response = await fetch(path, {
+            headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+            ...options
         });
+        const contentType = response.headers.get("content-type") || "";
+        const data = contentType.includes("application/json") ? await response.json() : await response.text();
+        if (!response.ok) {
+            throw new Error(typeof data === "string" ? data : (data.detail || JSON.stringify(data)));
+        }
+        return data;
+    };
 
-        document.getElementById('trainForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            const payload = {
-                data_path: formData.get('data_path') || null,
-                save_model: true
-            };
-            try {
-                const result = await api('/train', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                document.getElementById('status').textContent = JSON.stringify(result, null, 2);
-            } catch (error) {
-                document.getElementById('status').textContent = 'Error: ' + error.message;
-            }
-        });
+    const els = {
+        schemaName: document.getElementById("schemaName"),
+        listTablesBtn: document.getElementById("listTablesBtn"),
+        tableSelection: document.getElementById("tableSelection"),
+        baseTableSelect: document.getElementById("baseTableSelect"),
+        saveModel: document.getElementById("saveModel"),
+        trainBtn: document.getElementById("trainBtn"),
+        deleteBtn: document.getElementById("deleteBtn"),
+        trainStatus: document.getElementById("trainStatus"),
+        numRows: document.getElementById("numRows"),
+        generateBtn: document.getElementById("generateBtn"),
+        statusBtn: document.getElementById("statusBtn"),
+        statusBox: document.getElementById("statusBox"),
+        generatedData: document.getElementById("generatedData"),
+        downloadLink: document.getElementById("downloadLink")
+    };
 
-        document.getElementById('generateForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            const payload = {
-                num_rows: parseInt(formData.get('num_rows')),
-                randomize_seed: formData.has('randomize_seed')
-            };
-            try {
-                const result = await api('/generate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                document.getElementById('generatedData').textContent = JSON.stringify(result.data, null, 2);
-                document.getElementById('downloadLink').innerHTML = `<a href="/download/${result.filename}" target="_blank">Download JSON: ${result.filename}</a>`;
-                document.getElementById('status').textContent = 'Generated successfully';
-            } catch (error) {
-                document.getElementById('status').textContent = 'Error: ' + error.message;
-            }
-        });
+    function selectedTables() {
+        return Array.from(document.querySelectorAll("#tableSelection input:checked")).map((input) => input.value);
+    }
 
-        document.getElementById('deleteForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            try {
-                const result = await api('/delete', { method: 'POST' });
-                document.getElementById('status').textContent = JSON.stringify(result, null, 2);
-            } catch (error) {
-                document.getElementById('status').textContent = 'Error: ' + error.message;
-            }
+    function refreshBaseTableOptions(tables) {
+        const current = els.baseTableSelect.value;
+        els.baseTableSelect.innerHTML = '<option value="">Auto-select first table</option>';
+        tables.forEach((table) => {
+            const option = document.createElement("option");
+            option.value = table;
+            option.textContent = table;
+            els.baseTableSelect.appendChild(option);
         });
-    </script>
+        if (tables.includes(current)) {
+            els.baseTableSelect.value = current;
+        }
+    }
+
+    async function loadTables() {
+        const schemaName = els.schemaName.value.trim();
+        const path = schemaName ? `/tables?schema_name=${encodeURIComponent(schemaName)}` : "/tables";
+        const result = await api(path);
+        const tables = result.tables || [];
+        els.tableSelection.innerHTML = tables.map((table) =>
+            `<label><input type="checkbox" value="${table}"> ${table}</label>`
+        ).join("");
+        refreshBaseTableOptions(tables);
+    }
+
+    async function train() {
+        const tables = selectedTables();
+        if (!tables.length) {
+            throw new Error("Select at least one table for training.");
+        }
+
+        const result = await api("/train", {
+            method: "POST",
+            body: JSON.stringify({
+                table_names: tables,
+                schema_name: els.schemaName.value.trim() || null,
+                base_table: els.baseTableSelect.value || null,
+                save_model: els.saveModel.value === "true"
+            })
+        });
+        els.trainStatus.textContent = JSON.stringify(result, null, 2);
+        await refreshStatus();
+    }
+
+    async function generate() {
+        const result = await api("/generate", {
+            method: "POST",
+            body: JSON.stringify({
+                num_rows: Number(els.numRows.value),
+                randomize_seed: false
+            })
+        });
+        els.generatedData.textContent = JSON.stringify(result.data, null, 2);
+        els.downloadLink.innerHTML = result.filename
+            ? `<a href="/output/${result.filename}" target="_blank" rel="noopener">Open saved JSON: ${result.filename}</a>`
+            : "";
+        await refreshStatus();
+    }
+
+    async function refreshStatus() {
+        const result = await api("/status");
+        els.statusBox.textContent = JSON.stringify(result, null, 2);
+    }
+
+    async function deleteModel() {
+        const result = await api("/delete", { method: "POST" });
+        els.trainStatus.textContent = JSON.stringify(result, null, 2);
+        els.generatedData.textContent = "";
+        els.downloadLink.innerHTML = "";
+        await refreshStatus();
+    }
+
+    els.listTablesBtn.addEventListener("click", () => loadTables().catch((error) => {
+        els.trainStatus.textContent = error.message;
+    }));
+    els.trainBtn.addEventListener("click", () => train().catch((error) => {
+        els.trainStatus.textContent = error.message;
+    }));
+    els.generateBtn.addEventListener("click", () => generate().catch((error) => {
+        els.generatedData.textContent = error.message;
+    }));
+    els.statusBtn.addEventListener("click", () => refreshStatus().catch((error) => {
+        els.statusBox.textContent = error.message;
+    }));
+    els.deleteBtn.addEventListener("click", () => deleteModel().catch((error) => {
+        els.trainStatus.textContent = error.message;
+    }));
+
+    refreshStatus().catch(() => {});
+</script>
 </body>
 </html>

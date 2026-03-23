@@ -9,8 +9,13 @@ client = TestClient(app)
 
 def setup_function():
     service.synthesizer = None
-    service.trained_on_rows = None
-    service.trained_on_columns = None
+    service.model_type = None
+    service.schema_name = None
+    service.base_table = None
+    service.trained_tables = None
+    service.trained_columns = None
+    service.row_counts = None
+    service.relationships = None
 
 
 def test_generate_rejects_invalid_num_rows():
