@@ -67,6 +67,26 @@
         .table-list {
             columns: 2;
         }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            text-align: left;
+            border-bottom: 1px solid var(--line);
+            padding: 8px;
+            vertical-align: top;
+        }
+        .rule-config {
+            min-width: 240px;
+        }
+        .locked {
+            opacity: 0.6;
+        }
+        .muted {
+            color: #6b7280;
+            font-size: 0.85rem;
+        }
         pre {
             white-space: pre-wrap;
             word-break: break-word;
@@ -139,6 +159,23 @@
                 <input id="numRows" type="number" min="1" value="100">
             </label>
         </div>
+        <h3>Generation Rules</h3>
+        <p>
+            Optional post-processing rules run after the model generates rows.
+            Use <code>${column_name}</code> inside arithmetic expressions, for example
+            <code>${menge} * ${preis}</code>.
+        </p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Table</th>
+                    <th>Column</th>
+                    <th>Rule</th>
+                    <th>Config</th>
+                </tr>
+            </thead>
+            <tbody id="rulesBody"></tbody>
+        </table>
         <div class="actions">
             <button id="generateBtn" type="button">Generate</button>
             <button id="statusBtn" type="button" class="secondary">Refresh Status</button>
@@ -173,11 +210,17 @@
         deleteBtn: document.getElementById("deleteBtn"),
         trainStatus: document.getElementById("trainStatus"),
         numRows: document.getElementById("numRows"),
+        rulesBody: document.getElementById("rulesBody"),
         generateBtn: document.getElementById("generateBtn"),
         statusBtn: document.getElementById("statusBtn"),
         statusBox: document.getElementById("statusBox"),
         generatedData: document.getElementById("generatedData"),
         downloadLink: document.getElementById("downloadLink")
+    };
+    const state = {
+        primaryKeys: {},
+        relationships: [],
+        trainedColumns: {}
     };
 
     function selectedTables() {
@@ -228,12 +271,88 @@
         await refreshStatus();
     }
 
+    function protectedColumnsForTable(tableName) {
+        const protectedColumns = new Set();
+        const primaryKey = state.primaryKeys?.[tableName];
+        if (primaryKey) {
+            protectedColumns.add(primaryKey);
+        }
+        (state.relationships || []).forEach((relationship) => {
+            if (relationship.parent_table === tableName) {
+                protectedColumns.add(relationship.parent_key);
+            }
+            if (relationship.child_table === tableName) {
+                protectedColumns.add(relationship.child_key);
+            }
+        });
+        return protectedColumns;
+    }
+
+    function renderRules(trainedColumns) {
+        const body = els.rulesBody;
+        body.innerHTML = "";
+        if (!trainedColumns) {
+            return;
+        }
+
+        Object.entries(trainedColumns).forEach(([tableName, columns]) => {
+            const protectedColumns = protectedColumnsForTable(tableName);
+            columns.forEach((columnName) => {
+                const isLocked = protectedColumns.has(columnName);
+                const row = document.createElement("tr");
+                row.dataset.tableName = tableName;
+                row.dataset.columnName = columnName;
+                if (isLocked) {
+                    row.classList.add("locked");
+                }
+                row.innerHTML = `
+                    <td>${tableName}</td>
+                    <td>${columnName}${isLocked ? '<div class="muted">PK/FK locked</div>' : ""}</td>
+                    <td>
+                        <select class="rule-strategy" ${isLocked ? "disabled" : ""}>
+                            <option value="DEFAULT">DEFAULT</option>
+                            <option value="FIXED">FIXED</option>
+                            <option value="EXPRESSION">EXPRESSION</option>
+                            <option value="AGGREGATE">AGGREGATE</option>
+                        </select>
+                    </td>
+                    <td>
+                        <input class="rule-config" ${isLocked ? "disabled" : ""} placeholder="e.g. ${"${menge} * ${preis}"} or SUM(order_items.line_total BY order_id)">
+                    </td>
+                `;
+                body.appendChild(row);
+            });
+        });
+    }
+
+    function collectRules() {
+        const rulesByTable = {};
+        els.rulesBody.querySelectorAll("tr").forEach((row) => {
+            const strategy = row.querySelector(".rule-strategy").value;
+            const config = row.querySelector(".rule-config").value.trim();
+            if (strategy === "DEFAULT") {
+                return;
+            }
+            const tableName = row.dataset.tableName;
+            const columnName = row.dataset.columnName;
+            if (!rulesByTable[tableName]) {
+                rulesByTable[tableName] = {};
+            }
+            rulesByTable[tableName][columnName] = {
+                strategy,
+                config: config || null
+            };
+        });
+        return Object.keys(rulesByTable).length ? rulesByTable : null;
+    }
+
     async function generate() {
         const result = await api("/generate", {
             method: "POST",
             body: JSON.stringify({
                 num_rows: Number(els.numRows.value),
-                randomize_seed: false
+                randomize_seed: false,
+                column_rules_by_table: collectRules()
             })
         });
         els.generatedData.textContent = JSON.stringify(result.data, null, 2);
@@ -245,7 +364,11 @@
 
     async function refreshStatus() {
         const result = await api("/status");
+        state.primaryKeys = result.primary_keys || {};
+        state.relationships = result.relationships || [];
+        state.trainedColumns = result.trained_columns || {};
         els.statusBox.textContent = JSON.stringify(result, null, 2);
+        renderRules(result.trained_columns);
     }
 
     async function deleteModel() {

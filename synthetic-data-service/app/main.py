@@ -100,7 +100,10 @@ def train_model(request: TrainRequest) -> TrainResponse:
 def generate_rows(request: GenerateRequest) -> GenerateResponse:
     """Generate synthetic data from the active model."""
 
-    response = service.generate(num_rows=request.num_rows)
+    response = service.generate(
+        num_rows=request.num_rows,
+        column_rules_by_table=request.column_rules_by_table,
+    )
     filename = f"generated_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
     with (output_dir / filename).open("w", encoding="utf-8") as file_obj:
         json.dump(response.model_dump(), file_obj, indent=2)

@@ -56,6 +56,7 @@ class GenerateRequest(BaseModel):
 
     num_rows: int = Field(..., gt=0)
     randomize_seed: bool = False
+    column_rules_by_table: dict[str, dict[str, "SyntheticColumnRule"]] | None = None
 
     @field_validator("num_rows")
     @classmethod
@@ -79,6 +80,21 @@ class GenerateResponse(BaseModel):
     filename: str | None = None
 
 
+class SyntheticColumnRule(BaseModel):
+    """Column-level post-processing rule for generated output."""
+
+    strategy: str
+    config: str | None = None
+
+    @field_validator("strategy")
+    @classmethod
+    def validate_strategy(cls, value: str) -> str:
+        normalized = value.strip().upper()
+        if normalized not in {"DEFAULT", "FIXED", "EXPRESSION", "AGGREGATE"}:
+            raise ValueError("strategy must be DEFAULT, FIXED, EXPRESSION, or AGGREGATE")
+        return normalized
+
+
 class StatusResponse(BaseModel):
     """Current service/model status."""
 
@@ -90,6 +106,7 @@ class StatusResponse(BaseModel):
     trained_tables: list[str] | None
     trained_columns: dict[str, list[str]] | None
     row_counts: dict[str, int] | None
+    primary_keys: dict[str, str | None] | None
     relationships: list[dict[str, str]] | None
     model_path: str
 

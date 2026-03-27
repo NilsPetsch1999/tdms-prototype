@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import json
 from pathlib import Path
+import re
 from typing import Any
 
 import pandas as pd
@@ -13,8 +14,13 @@ from fastapi import HTTPException, status
 
 from app.config import Settings, get_settings
 from app.model_store import load_synthesizer, model_exists, save_synthesizer
-from app.schemas import GenerateResponse, StatusResponse, TrainResponse
+from app.schemas import GenerateResponse, StatusResponse, SyntheticColumnRule, TrainResponse
 from app.trainer import build_metadata, load_tables_from_db, sample_synthetic_data, train_synthesizer
+
+AGGREGATE_PATTERN = re.compile(
+    r"^\s*(SUM|COUNT|AVG|MIN|MAX)\(\s*([a-zA-Z0-9_]+)\.([a-zA-Z0-9_]+)\s+BY\s+([a-zA-Z0-9_]+)\s*\)\s*$",
+    re.IGNORECASE,
+)
 
 
 @dataclass
@@ -123,7 +129,11 @@ class SyntheticDataService:
             ),
         )
 
-    def generate(self, num_rows: int) -> GenerateResponse:
+    def generate(
+        self,
+        num_rows: int,
+        column_rules_by_table: dict[str, dict[str, SyntheticColumnRule]] | None = None,
+    ) -> GenerateResponse:
         if self.synthesizer is None or self.model_type is None or self.base_table is None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -149,7 +159,12 @@ class SyntheticDataService:
             self.primary_keys or {},
             self.relationships or [],
         )
-        sampled = _apply_consistency_rules(sampled)
+        sampled = _apply_configured_rules(
+            sampled,
+            column_rules_by_table or {},
+            self.primary_keys or {},
+            self.relationships or [],
+        )
 
         payload = {
             table_name: _dataframe_to_records(df)
@@ -175,6 +190,7 @@ class SyntheticDataService:
             trained_tables=self.trained_tables,
             trained_columns=self.trained_columns,
             row_counts=self.row_counts,
+            primary_keys=self.primary_keys,
             relationships=self.relationships,
             model_path=str(self.settings.resolve_path(self.model_path)),
         )
@@ -262,54 +278,58 @@ def _metadata_file_for(path: Path) -> Path:
     return path.with_suffix(path.suffix + ".meta.json")
 
 
-def _apply_consistency_rules(sampled: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
+def _apply_configured_rules(
+    sampled: dict[str, pd.DataFrame],
+    column_rules_by_table: dict[str, dict[str, SyntheticColumnRule]],
+    primary_keys: dict[str, str | None],
+    relationships: list[dict[str, str]],
+) -> dict[str, pd.DataFrame]:
     adjusted = {table_name: df.copy() for table_name, df in sampled.items()}
+    protected_columns = _protected_columns_by_table(primary_keys, relationships)
 
-    for table_name, df in adjusted.items():
-        lower_columns = {column.lower(): column for column in df.columns}
+    # Apply fixed overrides first, then aggregates, then expressions.
+    # This lets expressions depend on aggregate-derived parent values.
+    for table_name, rules_for_table in column_rules_by_table.items():
+        df = adjusted.get(table_name)
+        if df is None or not rules_for_table:
+            continue
 
-        quantity_col = lower_columns.get("quantity")
-        unit_price_col = lower_columns.get("unit_price")
-        line_total_col = lower_columns.get("line_total")
-        if quantity_col and unit_price_col and line_total_col:
-            df[line_total_col] = df.apply(
-                lambda row: _rounded_amount(row[quantity_col]) * _rounded_amount(row[unit_price_col]),
-                axis=1,
-            )
+        for column_name, rule in rules_for_table.items():
+            if column_name not in df.columns:
+                continue
+            if column_name in protected_columns.get(table_name, set()):
+                continue
+            if rule.strategy == "FIXED":
+                df[column_name] = df.apply(
+                    lambda row: _coerce_rule_result(rule.config, row.get(column_name)),
+                    axis=1,
+                )
 
-        subtotal_col = lower_columns.get("subtotal_amount")
-        shipping_col = lower_columns.get("shipping_amount")
-        total_col = lower_columns.get("total_amount")
-        if subtotal_col and shipping_col and total_col:
-            df[total_col] = df.apply(
-                lambda row: _rounded_amount(row[subtotal_col]) + _rounded_amount(row[shipping_col]),
-                axis=1,
-            )
+    adjusted = _apply_aggregate_rules(
+        adjusted,
+        column_rules_by_table,
+        protected_columns,
+        relationships,
+    )
 
-    order_items_table = _find_table(sampled=adjusted, candidates={"order_items", "orderitems"})
-    orders_table = _find_table(sampled=adjusted, candidates={"orders"})
-    if order_items_table and orders_table:
-        order_items_df = adjusted[order_items_table]
-        orders_df = adjusted[orders_table]
-        order_id_col = _find_column(order_items_df, "order_id")
-        line_total_col = _find_column(order_items_df, "line_total")
-        order_pk_col = _find_column(orders_df, "id")
-        subtotal_col = _find_column(orders_df, "subtotal_amount")
-        shipping_col = _find_column(orders_df, "shipping_amount")
-        total_col = _find_column(orders_df, "total_amount")
+    for table_name, rules_for_table in column_rules_by_table.items():
+        df = adjusted.get(table_name)
+        if df is None or not rules_for_table:
+            continue
 
-        if order_id_col and line_total_col and order_pk_col and subtotal_col:
-            order_totals = (
-                order_items_df.groupby(order_id_col)[line_total_col]
-                .sum()
-                .to_dict()
-            )
-            orders_df[subtotal_col] = orders_df[order_pk_col].map(
-                lambda value: order_totals.get(value, Decimal("0.00"))
-            )
-            if shipping_col and total_col:
-                orders_df[total_col] = orders_df.apply(
-                    lambda row: _rounded_amount(row[subtotal_col]) + _rounded_amount(row[shipping_col]),
+        for column_name, rule in rules_for_table.items():
+            if column_name not in df.columns:
+                continue
+            if column_name in protected_columns.get(table_name, set()):
+                continue
+            if rule.strategy == "EXPRESSION":
+                df[column_name] = df.apply(
+                    lambda row: _evaluate_expression_rule(
+                        rule.config or "",
+                        row,
+                        row.get(column_name),
+                        table_name,
+                    ),
                     axis=1,
                 )
 
@@ -325,16 +345,256 @@ def _rounded_amount(value: Any) -> Decimal:
         return Decimal("0.00")
     return decimal_value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
+def _evaluate_expression_rule(
+    expression: str,
+    row: pd.Series,
+    current_value: Any,
+    table_name: str,
+) -> Any:
+    resolved = _resolve_numeric_expression(expression, row, table_name)
+    value = _ArithmeticParser(resolved).parse()
+    return _coerce_rule_result(value, current_value)
 
-def _find_table(sampled: dict[str, pd.DataFrame], candidates: set[str]) -> str | None:
-    for table_name in sampled:
-        if table_name.lower() in candidates:
-            return table_name
+
+def _resolve_numeric_expression(expression: str, row: pd.Series, table_name: str) -> str:
+    resolved = expression
+    for column_name in row.index:
+        replacement = _decimal_to_expression_value(row[column_name])
+        plain_tokens = [
+            "${" + str(column_name) + "}",
+            "${" + table_name + "." + str(column_name) + "}",
+            table_name + "." + str(column_name),
+        ]
+        for token in plain_tokens:
+            if token in resolved:
+                resolved = resolved.replace(token, replacement)
+    return resolved.replace(" ", "")
+
+
+def _decimal_to_expression_value(value: Any) -> str:
+    decimal_value = _rounded_amount(value)
+    return decimal_value.normalize().to_eng_string()
+
+
+def _coerce_rule_result(value: Any, current_value: Any) -> Any:
+    if value is None:
+        return None
+
+    if isinstance(current_value, Decimal):
+        return _rounded_amount(value)
+    if isinstance(current_value, bool):
+        if isinstance(value, str):
+            return value.strip().lower() in {"true", "1", "yes"}
+        return bool(value)
+    if isinstance(current_value, int) and not isinstance(current_value, bool):
+        return int(_rounded_amount(value))
+    if isinstance(current_value, float):
+        return float(_rounded_amount(value))
+    if hasattr(current_value, "isoformat"):
+        return value
+    return value if isinstance(value, str) else str(value)
+
+
+class _ArithmeticParser:
+    def __init__(self, expression: str):
+        self.expression = expression
+        self.index = 0
+
+    def parse(self) -> Decimal:
+        value = self._parse_expression()
+        if self.index != len(self.expression):
+            raise ValueError(f"Invalid arithmetic expression: {self.expression}")
+        return value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    def _parse_expression(self) -> Decimal:
+        value = self._parse_term()
+        while self.index < len(self.expression):
+            operator = self.expression[self.index]
+            if operator not in "+-":
+                break
+            self.index += 1
+            next_value = self._parse_term()
+            value = value + next_value if operator == "+" else value - next_value
+        return value
+
+    def _parse_term(self) -> Decimal:
+        value = self._parse_factor()
+        while self.index < len(self.expression):
+            operator = self.expression[self.index]
+            if operator not in "*/":
+                break
+            self.index += 1
+            next_value = self._parse_factor()
+            value = value * next_value if operator == "*" else value / next_value
+        return value
+
+    def _parse_factor(self) -> Decimal:
+        if self.index >= len(self.expression):
+            raise ValueError(f"Unexpected end of expression: {self.expression}")
+
+        current = self.expression[self.index]
+        if current == "(":
+            self.index += 1
+            value = self._parse_expression()
+            self._expect(")")
+            return value
+        if current == "+":
+            self.index += 1
+            return self._parse_factor()
+        if current == "-":
+            self.index += 1
+            return self._parse_factor() * Decimal("-1")
+
+        start = self.index
+        while self.index < len(self.expression) and (
+            self.expression[self.index].isdigit() or self.expression[self.index] == "."
+        ):
+            self.index += 1
+
+        if start == self.index:
+            raise ValueError(f"Expected number in expression: {self.expression}")
+
+        return Decimal(self.expression[start:self.index])
+
+    def _expect(self, expected: str) -> None:
+        if self.index >= len(self.expression) or self.expression[self.index] != expected:
+            raise ValueError(f"Expected '{expected}' in expression: {self.expression}")
+        self.index += 1
+
+
+def _protected_columns_by_table(
+    primary_keys: dict[str, str | None],
+    relationships: list[dict[str, str]],
+) -> dict[str, set[str]]:
+    protected: dict[str, set[str]] = {}
+
+    for table_name, primary_key in primary_keys.items():
+        if primary_key:
+            protected.setdefault(table_name, set()).add(primary_key)
+
+    for relationship in relationships:
+        protected.setdefault(relationship["child_table"], set()).add(relationship["child_key"])
+        protected.setdefault(relationship["parent_table"], set()).add(relationship["parent_key"])
+
+    return protected
+
+
+def _apply_aggregate_rules(
+    sampled: dict[str, pd.DataFrame],
+    column_rules_by_table: dict[str, dict[str, SyntheticColumnRule]],
+    protected_columns: dict[str, set[str]],
+    relationships: list[dict[str, str]],
+) -> dict[str, pd.DataFrame]:
+    adjusted = {table_name: df.copy() for table_name, df in sampled.items()}
+
+    for target_table, rules_for_table in column_rules_by_table.items():
+        target_df = adjusted.get(target_table)
+        if target_df is None or not rules_for_table:
+            continue
+
+        for target_column, rule in rules_for_table.items():
+            if rule.strategy != "AGGREGATE":
+                continue
+            if target_column in protected_columns.get(target_table, set()):
+                continue
+            if target_column not in target_df.columns:
+                continue
+
+            aggregate = _parse_aggregate_rule(rule.config or "", target_table, target_column)
+            child_df = adjusted.get(aggregate["child_table"])
+            if child_df is None:
+                continue
+
+            relationship = _find_matching_relationship(
+                relationships,
+                target_table=target_table,
+                child_table=aggregate["child_table"],
+                group_by_column=aggregate["group_by_column"],
+            )
+            if relationship is None:
+                raise ValueError(
+                    f"No matching relationship found for aggregate rule on "
+                    f"{target_table}.{target_column}"
+                )
+
+            parent_key = relationship["parent_key"]
+            child_key = relationship["child_key"]
+            if parent_key not in target_df.columns:
+                continue
+            if child_key not in child_df.columns:
+                continue
+
+            aggregated_values = _compute_aggregate(
+                child_df=child_df,
+                value_column=aggregate["value_column"],
+                group_by_column=child_key,
+                function_name=aggregate["function_name"],
+            )
+            target_df[target_column] = target_df[parent_key].map(
+                lambda value: _coerce_rule_result(
+                    aggregated_values.get(value, Decimal("0.00")),
+                    target_df[target_column].iloc[0] if len(target_df) else None,
+                )
+            )
+
+    return adjusted
+
+
+def _parse_aggregate_rule(config: str, target_table: str, target_column: str) -> dict[str, str]:
+    match = AGGREGATE_PATTERN.match(config)
+    if not match:
+        raise ValueError(
+            f"Invalid aggregate rule for {target_table}.{target_column}. "
+            f"Expected format like SUM(order_items.line_total BY order_id)."
+        )
+    return {
+        "function_name": match.group(1).upper(),
+        "child_table": match.group(2),
+        "value_column": match.group(3),
+        "group_by_column": match.group(4),
+    }
+
+
+def _find_matching_relationship(
+    relationships: list[dict[str, str]],
+    target_table: str,
+    child_table: str,
+    group_by_column: str,
+) -> dict[str, str] | None:
+    for relationship in relationships:
+        if relationship["parent_table"] != target_table:
+            continue
+        if relationship["child_table"] != child_table:
+            continue
+        if relationship["child_key"] != group_by_column:
+            continue
+        return relationship
     return None
 
 
-def _find_column(df: pd.DataFrame, column_name: str) -> str | None:
-    for actual_column in df.columns:
-        if actual_column.lower() == column_name.lower():
-            return actual_column
-    return None
+def _compute_aggregate(
+    child_df: pd.DataFrame,
+    value_column: str,
+    group_by_column: str,
+    function_name: str,
+) -> dict[Any, Any]:
+    if group_by_column not in child_df.columns:
+        raise ValueError(f"Aggregate group-by column not found: {group_by_column}")
+    if function_name != "COUNT" and value_column not in child_df.columns:
+        raise ValueError(f"Aggregate value column not found: {value_column}")
+
+    grouped = child_df.groupby(group_by_column, dropna=False)
+
+    if function_name == "COUNT":
+        return grouped.size().to_dict()
+
+    if function_name == "SUM":
+        return grouped[value_column].sum().to_dict()
+    if function_name == "AVG":
+        return grouped[value_column].mean().to_dict()
+    if function_name == "MIN":
+        return grouped[value_column].min().to_dict()
+    if function_name == "MAX":
+        return grouped[value_column].max().to_dict()
+
+    raise ValueError(f"Unsupported aggregate function: {function_name}")
